@@ -15,11 +15,17 @@ In addition, in order to avoid coming off as rude to helpful contributors, pleas
 - Closing without providing a reason
 - Merging with the intention to rewrite that code soon after
 
+Project review priority is stability of the visible NT 5.x-compatible system. Regressions in boot, logon, explorer, desktop, start menu, tray, input, storage, networking, setup and shutdown should be treated as release-relevant even when the affected patch is otherwise small.
+
 Before merging a PR, make sure it follows the [contributing rules](CONTRIBUTING.md#rules-and-recommendations), but more importantly:
 - Make sure the author has specified a real e-mail in all PR commits
 - If PR contains code or translations, make sure the author has not specified a nickname or alias, but a full legal name in all PR commits
 - If PR contains media (wallpapers, themes, icons, sounds) or out-of-code documentation, make sure the author has specified the name or alias in all PR commits
 - If PR contains mixed code with media changes, handle it as PR with code
+- Verify that the PR does not weaken the documented NT 5.x-visible contract in favor of a more "pure" internal design
+- Prefer pragmatic designs that reduce crashes, races, repaint issues or recovery failures without changing external behavior
+- Ask for explicit validation when a PR touches explorer, shellmenu, comctl32, win32k, setup, services, session startup or shutdown paths
+- Block merges that introduce or leave unresolved visible regressions in common user flows simply because the code looks architecturally cleaner
 - Important notes before using "Squash and merge" strategy on a PR:
   - Make sure the author's name in GitHub profile matches one in commits. If this is not the case, ask the author to set it accordingly.
   - If the author does not want to set the name in GitHub profile:
@@ -28,3 +34,5 @@ Before merging a PR, make sure it follows the [contributing rules](CONTRIBUTING.
 	- Finally in this case a PR has to be merged either using "Rebase and merge" strategy or manually.
   - By pressing "Squash and merge" button in a PR you can make sure the author does not use no-reply e-mail -
   under the commit message there will be a text label saying: `This commit will be authored by <address@email.com>`
+
+For direction and validation policy, see [Technical Direction](TECHNICAL_DIRECTION.md) and [Stability Validation](STABILITY_VALIDATION.md).
