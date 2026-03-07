@@ -7,8 +7,8 @@
 ---
 
 <p align=center>
-  <a href="https://reactos.org/project-news/reactos-0415-released/">
-    <img alt="ReactOS 0.4.15 Release" src="https://img.shields.io/badge/release-0.4.15-0688CB.svg"></a>
+  <a href="https://reactos.org/download/">
+    <img alt="ReactOS 0.5.0-dev" src="https://img.shields.io/badge/development-0.5.0--dev-0688CB.svg"></a>
   <a href="https://reactos.org/download/">
     <img alt="Download ReactOS" src="https://img.shields.io/badge/download-latest-0688CB.svg"></a>
   <a href="https://sourceforge.net/projects/reactos/">
@@ -33,9 +33,11 @@
 
 ## What is ReactOS?
 
-ReactOS™ is an Open Source effort to develop a quality operating system that is compatible with applications and drivers written for the Microsoft® Windows™ NT family of operating systems (NT4, 2000, XP, 2003, Vista, 7).
+ReactOS™ is an Open Source effort to develop a quality operating system that is compatible with applications and drivers written for the Microsoft® Windows™ NT family of operating systems.
 
-The ReactOS project, although currently focused on Windows Server 2003 compatibility, is always keeping an eye toward compatibility with Windows Vista and future Windows NT releases.
+Current development is focused on delivering a stable NT 5.x-compatible system, with Windows 2000, XP and Server 2003 behavior treated as the primary external contract for user-mode software and core system components.
+
+ReactOS accepts pragmatic implementation choices when they improve stability, diagnosability or maintainability, as long as they preserve the expected NT 5.x-visible behavior.
 
 The code of ReactOS is licensed under [GNU GPL 2.0](https://github.com/reactos/reactos/blob/master/COPYING).
 
@@ -78,6 +80,10 @@ See ["Installing ReactOS"](https://reactos.org/wiki/Installing_ReactOS) Wiki pag
 
 ## Testing
 
+ReactOS development prioritizes visible system stability over feature expansion. Regressions in boot, logon, explorer, desktop, start menu, tray, input, networking, storage or shutdown behavior take priority over new features.
+
+See [Technical Direction](TECHNICAL_DIRECTION.md), [Stability Validation](STABILITY_VALIDATION.md), [ReactOS 0.5.0 Roadmap](ROADMAP_0.5.0.md) and [Solo + AI Workflow](SOLO_AI_WORKFLOW.md) for the current engineering policy, release validation expectations and maintenance workflow for this fork.
+
 If you discover a bug in ReactOS search on JIRA first - it might be reported already. If not report the bug providing logs and as much information as possible.
 
 See ["File Bugs"](https://reactos.org/wiki/File_Bugs) for a guide.
@@ -87,6 +93,8 @@ __NOTE:__ The bug tracker is _not_ for discussions. Please use our [official cha
 ## Contributing  [![prwelcome.badge]](https://reactos.org/wiki/Commiting_Changes)
 
 We are always looking for developers! Check [how to contribute](CONTRIBUTING.md) if you are willing to participate.
+
+Contributors working on new code paths should read [Technical Direction](TECHNICAL_DIRECTION.md) first. Changes that preserve or improve NT 5.x-visible behavior, system stability and diagnosability are preferred over changes that only make internals look closer to a specific historical NT implementation.
 
 __Legal notice__: If you have seen proprietary Microsoft Windows source code (including but not limited to the leaked Windows NT 3.5, NT 4, 2000 source code and the Windows Research Kernel), your contribution won't be accepted because of potential copyright violation.
 
@@ -102,6 +110,8 @@ ReactOS is a Free and Open Source operating system based on the Windows architec
 providing support for existing applications and drivers, and an alternative to the current dominant consumer operating system.
 
 It is not another wrapper built on Linux, like WINE. It does not attempt or plan to compete with WINE; in fact, the user-mode part of ReactOS is almost entirely WINE-based and our two teams have cooperated closely in the past.
+
+ReactOS is also not pursuing a moving compatibility target across later Windows releases. The current product direction is to harden the NT 5.x line first, and to judge internal design choices by the quality of the observable result rather than by purity of implementation.
 
 ReactOS is also not "yet another OS". It does not attempt to be a third player like any other alternative OS out there. People are not meant to uninstall Linux and use ReactOS instead; ReactOS is a replacement for Windows users who want a Windows replacement that behaves just like Windows.
 

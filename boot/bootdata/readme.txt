@@ -1,5 +1,5 @@
 ﻿========================
-ReactOS™ Version 0.4.x
+ReactOS™ Version 0.5.x
 Updated October 9, 2021
 ========================
 

@@ -4,6 +4,7 @@ There are several ways to contribute to the development of ReactOS. The most oft
 
 - [What To Do?](#what-to-do)
 - [How To Contribute?](#how-to-contribute)
+- [Project Direction](#project-direction)
 - [Where To Start?](#where-to-start)
 
 **Legal notice:** If you have seen Microsoft Windows source code, your contribution won't be accepted because of potential copyright violation. Before contributing, you must affirm that the following is true:
@@ -75,9 +76,25 @@ Our commit style is defined in a __[commit template]__. Use it as a reference or
 - *Search for similar pull requests/patches before submitting.* It may be that a similar pull request or issue was opened previously. Comment and review on that one instead.
 - *Keep your contribution small and focused on the topic.* It can be tempting to fix existing issues as you come across them while reading the source code. Resist the temptation and put in a note in the source code instead, or (even better) put the issue in the issue tracking system.
 - *Respect our __[Coding Style]__ and __[Programming Guidelines]__.*
+- *Prefer changes that improve NT 5.x-visible behavior, stability and diagnosability over changes that only make internals look more like historical NT.*
 - *Do not be afraid to ask questions.* Ask our developers in the [chat].
 
 To amend your commit with your name and e-mail (in any case you've forgot to set your name/e-mail) please take a look at this [guide](https://reactos.org/wiki/ReactOS_Git_For_Dummies#Amending_your_commit_with_name.2FE-mail). To set your name/e-mail globally for future commits that you push, [read this](https://reactos.org/wiki/ReactOS_Git_For_Dummies#Assign_commits_with_your_name_.26_E-mail_automatically).
+
+## Project Direction
+
+ReactOS currently targets a stable NT 5.x-compatible system. Windows 2000, XP and Server 2003 behavior is the primary compatibility contract for user-mode software and the visible system.
+
+When deciding between multiple approaches:
+
+- Preserve the externally observable NT 5.x contract first: Win32, NTDLL, shell behavior, services, setup, logon and other user-visible semantics.
+- Prefer simpler or more diagnosable internals when they improve stability and do not break the visible contract.
+- Do not extend the practical compatibility target toward Vista or later at the expense of NT 5.x stability.
+- Treat compatibility with Windows drivers as a secondary goal. Support what already works, but do not design the whole system around maximum historical driver coverage.
+- Keep Unix-inspired implementation techniques behind existing NT-facing interfaces. They are acceptable as internal tools or mechanisms, but they must not replace default Windows semantics.
+- Prioritize regressions in explorer, shell menus, desktop, tray, input, networking, storage, boot and shutdown over new feature work.
+
+See [Technical Direction](TECHNICAL_DIRECTION.md) and [Stability Validation](STABILITY_VALIDATION.md) for the detailed policy used by maintainers and reviewers.
 
 ## Where To Start?
 
