@@ -127,7 +127,7 @@ LRESULT CTrayShowDesktopButton::OnLButtonUp(UINT uMsg, WPARAM wParam, LPARAM lPa
 {
     m_bPressed = FALSE;
     ReleaseCapture();
-    Invalidate(TRUE);
+    Invalidate(FALSE);
 
     POINT pt;
     ::GetCursorPos(&pt);
@@ -140,7 +140,7 @@ LRESULT CTrayShowDesktopButton::OnLButtonDown(UINT uMsg, WPARAM wParam, LPARAM l
 {
     m_bPressed = TRUE;
     SetCapture();
-    Invalidate(TRUE);
+    Invalidate(FALSE);
     return 0;
 }
 
@@ -265,7 +265,7 @@ VOID CTrayShowDesktopButton::StartHovering()
         return;
 
     m_bHovering = TRUE;
-    Invalidate(TRUE);
+    Invalidate(FALSE);
 
     SetTimer(SHOW_DESKTOP_TIMER_ID, SHOW_DESKTOP_TIMER_INTERVAL, NULL);
 
@@ -289,7 +289,7 @@ LRESULT CTrayShowDesktopButton::OnTimer(UINT uMsg, WPARAM wParam, LPARAM lParam,
     {
         m_bHovering = FALSE;
         KillTimer(SHOW_DESKTOP_TIMER_ID);
-        Invalidate(TRUE);
+        Invalidate(FALSE);
 
         ::PostMessage(m_hWndTaskbar, WM_NCPAINT, 0, 0);
     }

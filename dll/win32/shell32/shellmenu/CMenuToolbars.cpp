@@ -313,6 +313,25 @@ void CMenuToolbarBase::InvalidateDraw()
     InvalidateRect(NULL, FALSE);
 }
 
+void CMenuToolbarBase::InvalidateButton(INT commandId)
+{
+    TBBUTTONINFO info = { 0 };
+    RECT rc;
+    INT index;
+
+    if (commandId < 0 || !m_hWnd)
+        return;
+
+    info.cbSize = sizeof(info);
+    info.dwMask = 0;
+    index = GetButtonInfo(commandId, &info);
+    if (index < 0)
+        return;
+
+    if (GetItemRect(index, &rc))
+        InvalidateRect(&rc, FALSE);
+}
+
 HRESULT CMenuToolbarBase::ShowDW(BOOL fShow)
 {
     if (m_hWnd == NULL)
@@ -587,6 +606,9 @@ HRESULT CMenuToolbarBase::KillPopupTimer()
 
 HRESULT CMenuToolbarBase::ChangeHotItem(CMenuToolbarBase * toolbar, INT item, DWORD dwFlags)
 {
+    CMenuToolbarBase *oldHotBar = m_hotBar;
+    INT oldHotItem = m_hotItem;
+
     // Ignore the change if it already matches the stored info
     if (m_hotBar == toolbar && m_hotItem == item)
         return S_FALSE;
@@ -641,12 +663,18 @@ HRESULT CMenuToolbarBase::ChangeHotItem(CMenuToolbarBase * toolbar, INT item, DW
         }
     }
 
-    InvalidateDraw();
+    if (oldHotBar)
+        oldHotBar->InvalidateButton(oldHotItem);
+    if (m_hotBar)
+        m_hotBar->InvalidateButton(m_hotItem);
     return S_OK;
 }
 
 HRESULT CMenuToolbarBase::ChangePopupItem(CMenuToolbarBase * toolbar, INT item)
 {
+    CMenuToolbarBase *oldPopupBar = m_popupBar;
+    INT oldPopupItem = m_popupItem;
+
     // Ignore the change if it already matches the stored info
     if (m_popupBar == toolbar && m_popupItem == item)
         return S_FALSE;
@@ -666,7 +694,10 @@ HRESULT CMenuToolbarBase::ChangePopupItem(CMenuToolbarBase * toolbar, INT item)
         CheckButton(m_popupItem, TRUE);
     }
 
-    InvalidateDraw();
+    if (oldPopupBar)
+        oldPopupBar->InvalidateButton(oldPopupItem);
+    if (m_popupBar)
+        m_popupBar->InvalidateButton(m_popupItem);
     return S_OK;
 }
 

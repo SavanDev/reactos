@@ -2509,7 +2509,7 @@ ChangePos:
     {
         if (!m_pShowDesktopButton || !m_pShowDesktopButton->IsWindow())
             return;
-        ::RedrawWindow(m_TrayNotify, NULL, NULL, RDW_INVALIDATE | RDW_ERASENOW | RDW_UPDATENOW);
+        ::RedrawWindow(m_TrayNotify, NULL, NULL, RDW_INVALIDATE | RDW_NOERASE | RDW_UPDATENOW);
     }
 
     LRESULT OnNcPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)

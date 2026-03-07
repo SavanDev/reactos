@@ -84,6 +84,7 @@ public:
     HRESULT SetPosSize(int x, int y, int cx, int cy);
 
     void InvalidateDraw();
+    void InvalidateButton(INT commandId);
 
     HRESULT DisableMouseTrack(BOOL bDisable);
 

@@ -860,6 +860,7 @@ BOOL CDefView::CreateList()
     {
         m_FolderSettings.fFlags |= FWF_NOCLIENTEDGE | FWF_NOSCROLL;
         dwStyle |= LVS_ALIGNLEFT;
+        ListExStyle |= LVS_EX_DOUBLEBUFFER;
         // LVS_EX_REGIONAL?
     }
     else
@@ -908,6 +909,9 @@ BOOL CDefView::CreateList()
 
     if (m_FolderSettings.fFlags & FWF_NOCOLUMNHEADER)
         dwStyle |= LVS_NOCOLUMNHEADER;
+
+    if (m_FolderSettings.fFlags & FWF_NOSCROLL)
+        dwStyle |= LVS_NOSCROLL;
 
 #if 0
     // FIXME: Because this is a negative, everyone gets the new flag by default unless they
@@ -4663,6 +4667,9 @@ HRESULT WINAPI CDefView::Drop(IDataObject* pDataObject, DWORD grfKeyState, POINT
         ::ClientToListView(m_ListView, &ptDrop);
         m_ptLastMousePos = ptDrop;
 
+        RECT rcDirty;
+        BOOL bHaveDirty = FALSE;
+        SetRectEmpty(&rcDirty);
         m_ListView.SetRedraw(FALSE);
         if (m_ListView.GetStyle() & LVS_AUTOARRANGE)
         {
@@ -4676,13 +4683,41 @@ HRESULT WINAPI CDefView::Drop(IDataObject* pDataObject, DWORD grfKeyState, POINT
             {
                 if (m_ListView.GetItemPosition(iItem, &ptItem))
                 {
+                    RECT rcOld, rcNew, rcUnion;
+
+                    if (m_FolderSettings.fFlags & FWF_DESKTOP)
+                        ListView_GetItemRect(m_ListView, iItem, &rcOld, LVIR_BOUNDS);
+
                     ptItem.x += m_ptLastMousePos.x - m_ptFirstMousePos.x;
                     ptItem.y += m_ptLastMousePos.y - m_ptFirstMousePos.y;
                     m_ListView.SetItemPosition(iItem, &ptItem);
+
+                    if ((m_FolderSettings.fFlags & FWF_DESKTOP) &&
+                        ListView_GetItemRect(m_ListView, iItem, &rcNew, LVIR_BOUNDS))
+                    {
+                        if (UnionRect(&rcUnion, &rcOld, &rcNew))
+                        {
+                            if (bHaveDirty)
+                                UnionRect(&rcDirty, &rcDirty, &rcUnion);
+                            else
+                            {
+                                rcDirty = rcUnion;
+                                bHaveDirty = TRUE;
+                            }
+                        }
+                    }
                 }
             }
         }
         m_ListView.SetRedraw(TRUE);
+        if (m_FolderSettings.fFlags & FWF_DESKTOP)
+        {
+            if (bHaveDirty && !(m_ListView.GetStyle() & LVS_AUTOARRANGE))
+                m_ListView.InvalidateRect(&rcDirty, TRUE);
+            else
+                m_ListView.InvalidateRect(NULL, TRUE);
+            m_ListView.UpdateWindow();
+        }
     }
     else if (m_pCurDropTarget)
     {
