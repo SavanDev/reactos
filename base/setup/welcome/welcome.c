@@ -960,7 +960,7 @@ ButtonSubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (nTopic != i)
         {
             nTopic = i;
-            InvalidateRect(hWndMain, &rcRightPanel, TRUE);
+            InvalidateRect(hWndMain, &rcRightPanel, FALSE);
         }
     }
     else if (uMsg == WM_KILLFOCUS)
@@ -974,7 +974,7 @@ ButtonSubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (GetParent(hWnd) == GetForegroundWindow())
         {
             nTopic = -1;
-            InvalidateRect(hWndMain, &rcRightPanel, TRUE);
+            InvalidateRect(hWndMain, &rcRightPanel, FALSE);
         }
     }
 
@@ -1067,8 +1067,8 @@ OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     lf.lfCharSet = ANSI_CHARSET;
     lf.lfOutPrecision  = OUT_DEFAULT_PRECIS;
     lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
-    lf.lfQuality = DEFAULT_QUALITY;
-    lf.lfPitchAndFamily = FF_DONTCARE;
+    lf.lfQuality = ANTIALIASED_QUALITY;
+    lf.lfPitchAndFamily = VARIABLE_PITCH | FF_SWISS;
     if (LoadString(hInstance, IDS_FONTNAME, lf.lfFaceName, ARRAYSIZE(lf.lfFaceName)) == 0)
         StringCchCopy(lf.lfFaceName, ARRAYSIZE(lf.lfFaceName), TEXT("Tahoma"));
 
@@ -1081,13 +1081,13 @@ OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     /* Topic description font */
     lf.lfHeight = -11;
     lf.lfWidth  = 0;
-    lf.lfWeight = FW_THIN;
+    lf.lfWeight = FW_NORMAL;
     hFontTopicDescription = CreateFontIndirect(&lf);
 
     /* Topic button font */
     lf.lfHeight = -11;
     lf.lfWidth  = 0;
-    lf.lfWeight = FW_BOLD;
+    lf.lfWeight = FW_NORMAL;
     hFontTopicButton = CreateFontIndirect(&lf);
 
     /* Load title bitmap */
@@ -1151,7 +1151,7 @@ OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
         {
             lf.lfHeight = -10;
             lf.lfWidth  = 0;
-            lf.lfWeight = FW_THIN;
+            lf.lfWeight = FW_NORMAL;
             hFontCheckButton = CreateFontIndirect(&lf);
 
             hWndCheckButton = CreateWindow(TEXT("BUTTON"),
@@ -1262,10 +1262,15 @@ OnPaint(HWND hWnd, WPARAM wParam, LPARAM lParam)
     HPEN hPen;
     HPEN hOldPen;
     HDC hdc;
+    HDC hdcPaint;
+    HDC hdcBuffer = NULL;
     PAINTSTRUCT ps;
     HBITMAP hOldBitmap = NULL;
+    HBITMAP hbmBuffer = NULL;
+    HBITMAP hbmOldBuffer = NULL;
     HBRUSH hOldBrush;
     HFONT hOldFont;
+    RECT rcClient;
     RECT rcTitle, rcDescription;
     BITMAP bmpInfo;
     TCHAR szVersion[50];
@@ -1275,36 +1280,51 @@ OnPaint(HWND hWnd, WPARAM wParam, LPARAM lParam)
     UNREFERENCED_PARAMETER(lParam);
 
     hdc = BeginPaint(hWnd, &ps);
+    hdcPaint = hdc;
+
+    GetClientRect(hWnd, &rcClient);
+    hdcBuffer = CreateCompatibleDC(hdc);
+    if (hdcBuffer)
+    {
+        hbmBuffer = CreateCompatibleBitmap(hdc,
+                                           rcClient.right - rcClient.left,
+                                           rcClient.bottom - rcClient.top);
+        if (hbmBuffer)
+        {
+            hbmOldBuffer = (HBITMAP)SelectObject(hdcBuffer, hbmBuffer);
+            hdcPaint = hdcBuffer;
+        }
+    }
 
     /* Banner panel */
-    PaintBanner(hdc, &rcTitlePanel);
+    PaintBanner(hdcPaint, &rcTitlePanel);
 
     /* Left panel */
-    hOldBrush = (HBRUSH)SelectObject(hdc, hbrLightBlue);
-    PatBlt(hdc,
+    hOldBrush = (HBRUSH)SelectObject(hdcPaint, hbrLightBlue);
+    PatBlt(hdcPaint,
            rcLeftPanel.left,
            rcLeftPanel.top,
            rcLeftPanel.right - rcLeftPanel.left,
            rcLeftPanel.bottom - rcLeftPanel.top,
            PATCOPY);
-    SelectObject(hdc, hOldBrush);
+    SelectObject(hdcPaint, hOldBrush);
 
     /* Right panel */
-    hOldBrush = (HBRUSH)SelectObject(hdc, GetStockObject(WHITE_BRUSH));
-    PatBlt(hdc,
+    hOldBrush = (HBRUSH)SelectObject(hdcPaint, GetStockObject(WHITE_BRUSH));
+    PatBlt(hdcPaint,
            rcRightPanel.left,
            rcRightPanel.top,
            rcRightPanel.right - rcRightPanel.left,
            rcRightPanel.bottom - rcRightPanel.top,
            PATCOPY);
-    SelectObject(hdc, hOldBrush);
+    SelectObject(hdcPaint, hOldBrush);
 
     /* Draw dark vertical line */
     hPen = CreatePen(PS_SOLID, 0, DARK_BLUE);
-    hOldPen = (HPEN)SelectObject(hdc, hPen);
-    MoveToEx(hdc, rcRightPanel.left, rcRightPanel.top, NULL);
-    LineTo(hdc, rcRightPanel.left, rcRightPanel.bottom);
-    SelectObject(hdc, hOldPen);
+    hOldPen = (HPEN)SelectObject(hdcPaint, hPen);
+    MoveToEx(hdcPaint, rcRightPanel.left, rcRightPanel.top, NULL);
+    LineTo(hdcPaint, rcRightPanel.left, rcRightPanel.bottom);
+    SelectObject(hdcPaint, hOldPen);
     DeleteObject(hPen);
 
     /* Draw topic bitmap */
@@ -1312,7 +1332,7 @@ OnPaint(HWND hWnd, WPARAM wParam, LPARAM lParam)
     {
         GetObject(hDefaultTopicBitmap, sizeof(bmpInfo), &bmpInfo);
         hOldBitmap = (HBITMAP)SelectObject(hdcMem, hDefaultTopicBitmap);
-        BitBlt(hdc,
+        BitBlt(hdcPaint,
                rcRightPanel.right - bmpInfo.bmWidth,
                rcRightPanel.bottom - bmpInfo.bmHeight,
                bmpInfo.bmWidth,
@@ -1326,7 +1346,7 @@ OnPaint(HWND hWnd, WPARAM wParam, LPARAM lParam)
     {
         GetObject(pTopics[nTopic]->hBitmap, sizeof(bmpInfo), &bmpInfo);
         hOldBitmap = (HBITMAP)SelectObject(hdcMem, pTopics[nTopic]->hBitmap);
-        BitBlt(hdc,
+        BitBlt(hdcPaint,
                rcRightPanel.right - bmpInfo.bmWidth,
                rcRightPanel.bottom - bmpInfo.bmHeight,
                bmpInfo.bmWidth,
@@ -1348,7 +1368,7 @@ OnPaint(HWND hWnd, WPARAM wParam, LPARAM lParam)
         lpDesc  = pTopics[nTopic]->szDesc;
     }
 
-    SetBkMode(hdc, TRANSPARENT);
+    SetBkMode(hdcPaint, TRANSPARENT);
 
     /* Draw version information */
     StringCchCopy(szVersion, ARRAYSIZE(szVersion),
@@ -1369,37 +1389,59 @@ OnPaint(HWND hWnd, WPARAM wParam, LPARAM lParam)
     rcTitle.top    = rcTitle.bottom - 43;
     rcTitle.bottom = rcTitle.bottom - 8;
 
-    hOldFont = (HFONT)SelectObject(hdc, hFontTopicDescription);
-    DrawText(hdc, szVersion, -1, &rcTitle, DT_BOTTOM | DT_CALCRECT | DT_SINGLELINE);
-    SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
-    DrawText(hdc, szVersion, -1, &rcTitle, DT_BOTTOM | DT_SINGLELINE);
-    SelectObject(hdc, hOldFont);
+    hOldFont = (HFONT)SelectObject(hdcPaint, hFontTopicDescription);
+    DrawText(hdcPaint, szVersion, -1, &rcTitle, DT_BOTTOM | DT_CALCRECT | DT_SINGLELINE);
+    SetTextColor(hdcPaint, GetSysColor(COLOR_WINDOWTEXT));
+    DrawText(hdcPaint, szVersion, -1, &rcTitle, DT_BOTTOM | DT_SINGLELINE);
+    SelectObject(hdcPaint, hOldFont);
 
     /* Draw topic title */
     rcTitle.left = rcRightPanel.left + 12;
     rcTitle.right = rcRightPanel.right - 8;
     rcTitle.top = rcRightPanel.top + 8;
     rcTitle.bottom = rcTitle.top + 57;
-    hOldFont = (HFONT)SelectObject(hdc, hFontTopicTitle);
-    DrawText(hdc, lpTitle, -1, &rcTitle, DT_TOP | DT_CALCRECT);
-    SetTextColor(hdc, DARK_BLUE);
-    DrawText(hdc, lpTitle, -1, &rcTitle, DT_TOP);
-    SelectObject(hdc, hOldFont);
+    hOldFont = (HFONT)SelectObject(hdcPaint, hFontTopicTitle);
+    DrawText(hdcPaint, lpTitle, -1, &rcTitle, DT_TOP | DT_CALCRECT);
+    SetTextColor(hdcPaint, DARK_BLUE);
+    DrawText(hdcPaint, lpTitle, -1, &rcTitle, DT_TOP);
+    SelectObject(hdcPaint, hOldFont);
 
     /* Draw topic description */
     rcDescription.left = rcRightPanel.left + 12;
     rcDescription.right = rcRightPanel.right - 8;
     rcDescription.top = rcTitle.bottom + 8;
     rcDescription.bottom = rcRightPanel.bottom - 20;
-    hOldFont = (HFONT)SelectObject(hdc, hFontTopicDescription);
-    SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
-    DrawText(hdc, lpDesc, -1, &rcDescription, DT_TOP | DT_WORDBREAK);
-    SelectObject(hdc, hOldFont);
+    hOldFont = (HFONT)SelectObject(hdcPaint, hFontTopicDescription);
+    SetTextColor(hdcPaint, GetSysColor(COLOR_WINDOWTEXT));
+    DrawText(hdcPaint, lpDesc, -1, &rcDescription, DT_TOP | DT_WORDBREAK);
+    SelectObject(hdcPaint, hOldFont);
 
-    SetBkMode(hdc, OPAQUE);
+    SetBkMode(hdcPaint, OPAQUE);
+
+    if (hdcPaint != hdc)
+    {
+        BitBlt(hdc,
+               ps.rcPaint.left,
+               ps.rcPaint.top,
+               ps.rcPaint.right - ps.rcPaint.left,
+               ps.rcPaint.bottom - ps.rcPaint.top,
+               hdcPaint,
+               ps.rcPaint.left,
+               ps.rcPaint.top,
+               SRCCOPY);
+    }
 
     SelectObject(hdcMem, hOldBrush);
     SelectObject(hdcMem, hOldBitmap);
+
+    if (hdcBuffer)
+    {
+        if (hbmOldBuffer)
+            SelectObject(hdcBuffer, hbmOldBuffer);
+        if (hbmBuffer)
+            DeleteObject(hbmBuffer);
+        DeleteDC(hdcBuffer);
+    }
 
     EndPaint(hWnd, &ps);
 
@@ -1487,7 +1529,7 @@ OnMouseMove(HWND hWnd, WPARAM wParam, LPARAM lParam)
         INT nOldTopic = nTopic;
         nTopic = -1;
         /* Also repaint the buttons, otherwise nothing repaints... */
-        InvalidateRect(pTopics[nOldTopic]->hWndButton, NULL, TRUE);
+        InvalidateRect(pTopics[nOldTopic]->hWndButton, NULL, FALSE);
 
         /* Set the focus to some other default button */
         if (hWndCheckButton)
@@ -1497,7 +1539,7 @@ OnMouseMove(HWND hWnd, WPARAM wParam, LPARAM lParam)
         // SetFocus(hWnd);
 
         /* Repaint the description panel */
-        InvalidateRect(hWndMain, &rcRightPanel, TRUE);
+        InvalidateRect(hWndMain, &rcRightPanel, FALSE);
     }
 
     wParamOld = wParam;
