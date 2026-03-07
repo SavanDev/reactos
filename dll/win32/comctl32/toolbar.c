@@ -3373,8 +3373,8 @@ TOOLBAR_CheckButton (TOOLBAR_INFO *infoPtr, INT Id, LPARAM lParam)
     if( bChecked != LOWORD(lParam) )
     {
         if (nOldIndex != -1)
-            InvalidateRect(infoPtr->hwndSelf, &infoPtr->buttons[nOldIndex].rect, TRUE);
-        InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+            InvalidateRect(infoPtr->hwndSelf, &infoPtr->buttons[nOldIndex].rect, FALSE);
+        InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, FALSE);
     }
 
     /* FIXME: Send a WM_NOTIFY?? */
@@ -4896,12 +4896,12 @@ TOOLBAR_SetHotItemEx (TOOLBAR_INFO *infoPtr, INT nHit, DWORD dwReason)
 	{
             if (oldBtnPtr) {
                 oldBtnPtr->bHot = FALSE;
-                InvalidateRect(infoPtr->hwndSelf, &oldBtnPtr->rect, TRUE);
+                InvalidateRect(infoPtr->hwndSelf, &oldBtnPtr->rect, FALSE);
             }
             /* setting disabled buttons as hot fails even if the notify contains the button id */
             if (btnPtr && (btnPtr->fsState & TBSTATE_ENABLED)) {
                 btnPtr->bHot = TRUE;
-                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, FALSE);
                 infoPtr->nHotItem = nHit;
             }
             else
@@ -5911,7 +5911,7 @@ TOOLBAR_LButtonDown (TOOLBAR_INFO *infoPtr, WPARAM wParam, LPARAM lParam)
             TOOLBAR_SetHotItemEx(infoPtr, nHit, HICF_MOUSE | HICF_LMOUSE);
 
             if (btnPtr->fsState & TBSTATE_ENABLED)
-                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, FALSE);
             UpdateWindow(infoPtr->hwndSelf);
             SetCapture (infoPtr->hwndSelf);
         }
@@ -6052,7 +6052,7 @@ TOOLBAR_LButtonUp (TOOLBAR_INFO *infoPtr, WPARAM wParam, LPARAM lParam)
 	}
 
         if (nOldIndex != -1)
-            InvalidateRect(infoPtr->hwndSelf, &infoPtr->buttons[nOldIndex].rect, TRUE);
+            InvalidateRect(infoPtr->hwndSelf, &infoPtr->buttons[nOldIndex].rect, FALSE);
 
 	/*
 	 * now we can ReleaseCapture, which triggers CAPTURECHANGED msg,
@@ -6160,7 +6160,7 @@ TOOLBAR_CaptureChanged(TOOLBAR_INFO *infoPtr)
         infoPtr->nOldHit = -1;
 
         if (btnPtr->fsState & TBSTATE_ENABLED)
-            InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+            InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, FALSE);
     }
     return 0;
 }
@@ -6270,11 +6270,11 @@ TOOLBAR_MouseMove (TOOLBAR_INFO *infoPtr, WPARAM wParam, LPARAM lParam)
             btnPtr = &infoPtr->buttons[infoPtr->nButtonDown];
             if (infoPtr->nOldHit == infoPtr->nButtonDown) {
                 btnPtr->fsState &= ~TBSTATE_PRESSED;
-                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, FALSE);
             }
             else if (nHit == infoPtr->nButtonDown) {
                 btnPtr->fsState |= TBSTATE_PRESSED;
-                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+                InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, FALSE);
             }
             infoPtr->nOldHit = nHit;
         }

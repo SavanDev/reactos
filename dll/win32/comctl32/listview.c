@@ -1748,9 +1748,31 @@ static inline BOOL is_redrawing(const LISTVIEW_INFO *infoPtr)
 
 static inline void LISTVIEW_InvalidateRect(const LISTVIEW_INFO *infoPtr, const RECT* rect)
 {
+    BOOL erase;
+
     if(!is_redrawing(infoPtr)) return; 
     TRACE(" invalidating rect=%s\n", wine_dbgstr_rect(rect));
+    erase = !(infoPtr->dwLvExStyle & LVS_EX_DOUBLEBUFFER);
+    InvalidateRect(infoPtr->hwndSelf, rect, erase);
+}
+
+static inline void LISTVIEW_InvalidateRectErase(const LISTVIEW_INFO *infoPtr, const RECT *rect)
+{
+    if(!is_redrawing(infoPtr)) return;
+    TRACE(" invalidating erase rect=%s\n", wine_dbgstr_rect(rect));
     InvalidateRect(infoPtr->hwndSelf, rect, TRUE);
+}
+
+static inline void LISTVIEW_InvalidateMarqueeRect(const LISTVIEW_INFO *infoPtr, const RECT *rect)
+{
+    if(!is_redrawing(infoPtr)) return;
+    TRACE(" invalidating marquee rect=%s\n", wine_dbgstr_rect(rect));
+    InvalidateRect(infoPtr->hwndSelf, rect, !(infoPtr->dwLvExStyle & LVS_EX_DOUBLEBUFFER));
+}
+
+static inline void LISTVIEW_InvalidateMarqueeRectErase(const LISTVIEW_INFO *infoPtr, const RECT *rect)
+{
+    LISTVIEW_InvalidateRectErase(infoPtr, rect);
 }
 
 static inline void LISTVIEW_InvalidateItem(const LISTVIEW_INFO *infoPtr, INT nItem)
@@ -3988,7 +4010,7 @@ static void LISTVIEW_MarqueeHighlight(LISTVIEW_INFO *infoPtr, const POINT *coord
     }
 
     /* Cancel out the old marquee rectangle and draw the new one */
-    LISTVIEW_InvalidateRect(infoPtr, &infoPtr->marqueeDrawRect);
+    LISTVIEW_InvalidateMarqueeRect(infoPtr, &infoPtr->marqueeDrawRect);
 
     /* Scroll by the appropriate distance if applicable - speed up scrolling as
        the cursor is further away */
@@ -4053,7 +4075,7 @@ static void LISTVIEW_MarqueeHighlight(LISTVIEW_INFO *infoPtr, const POINT *coord
     }
     iterator_destroy(&new_elems);
 
-    LISTVIEW_InvalidateRect(infoPtr, &infoPtr->marqueeDrawRect);
+    LISTVIEW_InvalidateMarqueeRect(infoPtr, &infoPtr->marqueeDrawRect);
 }
 
 /***
@@ -4601,8 +4623,20 @@ static BOOL LISTVIEW_SetItemT(LISTVIEW_INFO *infoPtr, LVITEMW *lpLVItem, BOOL is
 	    LISTVIEW_InvalidateSubItem(infoPtr, lpLVItem->iItem, lpLVItem->iSubItem);
 	else
         {
-            LISTVIEW_InvalidateRect(infoPtr, &oldItemArea);
-	    LISTVIEW_InvalidateItem(infoPtr, lpLVItem->iItem);
+            if (infoPtr->bMarqueeSelect ||
+                ((infoPtr->dwLvExStyle & LVS_EX_DOUBLEBUFFER) && infoPtr->clrBk == CLR_NONE))
+            {
+                RECT newItemArea;
+
+                LISTVIEW_InvalidateRectErase(infoPtr, &oldItemArea);
+                LISTVIEW_GetItemBox(infoPtr, lpLVItem->iItem, &newItemArea);
+                LISTVIEW_InvalidateRectErase(infoPtr, &newItemArea);
+            }
+            else
+            {
+                LISTVIEW_InvalidateRect(infoPtr, &oldItemArea);
+	        LISTVIEW_InvalidateItem(infoPtr, lpLVItem->iItem);
+            }
         }
     }
     /* restore text */
@@ -4670,6 +4704,13 @@ static INT LISTVIEW_GetTopIndex(const LISTVIEW_INFO *infoPtr)
  */
 static inline BOOL LISTVIEW_FillBkgnd(const LISTVIEW_INFO *infoPtr, HDC hdc, const RECT *lprcBox)
 {
+    if (infoPtr->clrBk == CLR_NONE)
+    {
+        if (infoPtr->dwLvExStyle & LVS_EX_TRANSPARENTBKGND)
+            return SendMessageW(infoPtr->hwndNotify, WM_PRINTCLIENT, (WPARAM)hdc, PRF_ERASEBKGND);
+        return SendMessageW(infoPtr->hwndNotify, WM_ERASEBKGND, (WPARAM)hdc, 0);
+    }
+
     if (!infoPtr->hBkBrush) return FALSE;
 
     TRACE("(hdc=%p, lprcBox=%s, hBkBrush=%p)\n", hdc, wine_dbgstr_rect(lprcBox), infoPtr->hBkBrush);
@@ -5273,6 +5314,8 @@ static void LISTVIEW_Refresh(LISTVIEW_INFO *infoPtr, HDC hdc, const RECT *prcEra
     HDC hdcOrig = hdc;
     HBITMAP hbmp = NULL;
     RANGE range;
+    RECT rcClip;
+    BOOL hasClip = FALSE;
 
     LISTVIEW_DUMP(infoPtr);
 
@@ -5295,8 +5338,9 @@ static void LISTVIEW_Refresh(LISTVIEW_INFO *infoPtr, HDC hdc, const RECT *prcEra
         SelectObject(hdc, hbmp);
         SelectObject(hdc, infoPtr->hFont);
 
-        if(GetClipBox(hdcOrig, &rcClient))
-            IntersectClipRect(hdc, rcClient.left, rcClient.top, rcClient.right, rcClient.bottom);
+        hasClip = GetClipBox(hdcOrig, &rcClip) > 0;
+        if (hasClip)
+            IntersectClipRect(hdc, rcClip.left, rcClip.top, rcClip.right, rcClip.bottom);
     } else {
         /* Save dc values we're gonna trash while drawing
          * FIXME: Should be done in LISTVIEW_DrawItem() */
@@ -5311,13 +5355,19 @@ static void LISTVIEW_Refresh(LISTVIEW_INFO *infoPtr, HDC hdc, const RECT *prcEra
     if (prcErase) {
         LISTVIEW_FillBkgnd(infoPtr, hdc, prcErase);
     } else if (infoPtr->dwLvExStyle & LVS_EX_DOUBLEBUFFER) {
-        /* If no erasing was done (usually because RedrawWindow was called
-         * with RDW_INVALIDATE only) we need to copy the old contents into
-         * the backbuffer before continuing. */
-        BitBlt(hdc, infoPtr->rcList.left, infoPtr->rcList.top,
-               infoPtr->rcList.right - infoPtr->rcList.left,
-               infoPtr->rcList.bottom - infoPtr->rcList.top,
-               hdcOrig, infoPtr->rcList.left, infoPtr->rcList.top, SRCCOPY);
+        if (infoPtr->bMarqueeSelect && hasClip) {
+            /* Rebuild the marquee clip area in the backbuffer so the old
+             * focus-rect XOR does not get copied from the screen. */
+            LISTVIEW_FillBkgnd(infoPtr, hdc, &rcClip);
+        } else {
+            /* If no erasing was done (usually because RedrawWindow was called
+             * with RDW_INVALIDATE only) we need to copy the old contents into
+             * the backbuffer before continuing. */
+            BitBlt(hdc, infoPtr->rcList.left, infoPtr->rcList.top,
+                   infoPtr->rcList.right - infoPtr->rcList.left,
+                   infoPtr->rcList.bottom - infoPtr->rcList.top,
+                   hdcOrig, infoPtr->rcList.left, infoPtr->rcList.top, SRCCOPY);
+        }
     }
 
     GetClientRect(infoPtr->hwndSelf, &rcClient);
@@ -10263,7 +10313,7 @@ static LRESULT LISTVIEW_KillFocus(LISTVIEW_INFO *infoPtr)
     if (infoPtr->bMarqueeSelect)
     {
         /* Remove the marquee rectangle and release our mouse capture */
-        LISTVIEW_InvalidateRect(infoPtr, &infoPtr->marqueeRect);
+        LISTVIEW_InvalidateMarqueeRectErase(infoPtr, &infoPtr->marqueeDrawRect);
         ReleaseCapture();
 
         SetRectEmpty(&infoPtr->marqueeRect);
@@ -10533,7 +10583,7 @@ static LRESULT LISTVIEW_LButtonUp(LISTVIEW_INFO *infoPtr, WORD wKey, INT x, INT 
         /* Remove the marquee rectangle and release our mouse capture */
         if (infoPtr->bMarqueeSelect)
         {
-            LISTVIEW_InvalidateRect(infoPtr, &infoPtr->marqueeDrawRect);
+            LISTVIEW_InvalidateMarqueeRectErase(infoPtr, &infoPtr->marqueeDrawRect);
             ReleaseCapture();
         }
 
