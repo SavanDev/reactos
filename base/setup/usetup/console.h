@@ -55,6 +55,13 @@ FillConsoleOutputCharacterA(
 
 BOOL
 WINAPI
+ClearConsoleScreen(
+    IN HANDLE hConsoleOutput,
+    IN CHAR cCharacter,
+    IN WORD wAttribute);
+
+BOOL
+WINAPI
 FreeConsole(VOID);
 
 BOOL

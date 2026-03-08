@@ -225,6 +225,86 @@ DrawListEntries(
 }
 
 static
+BOOLEAN
+GetVisibleListEntryRow(
+    IN PGENERIC_LIST_UI ListUi,
+    IN PLIST_ENTRY EntryToFind,
+    OUT PSHORT Row)
+{
+    PGENERIC_LIST List = ListUi->List;
+    PLIST_ENTRY Entry;
+    SHORT CurrentRow;
+
+    CurrentRow = ListUi->Top + 1;
+    Entry = ListUi->FirstShown;
+
+    while (Entry != &List->ListHead && CurrentRow < ListUi->Bottom)
+    {
+        if (Entry == EntryToFind)
+        {
+            *Row = CurrentRow;
+            return TRUE;
+        }
+
+        CurrentRow++;
+        Entry = Entry->Flink;
+    }
+
+    return FALSE;
+}
+
+static
+VOID
+DrawListEntry(
+    IN PGENERIC_LIST_UI ListUi,
+    IN PLIST_ENTRY Entry,
+    IN SHORT Row)
+{
+    PGENERIC_LIST_ENTRY ListEntry;
+    COORD coPos;
+    DWORD Written;
+    USHORT Width;
+
+    if (Entry == &ListUi->List->ListHead || Row <= ListUi->Top || Row >= ListUi->Bottom)
+        return;
+
+    ListEntry = CONTAINING_RECORD(Entry, GENERIC_LIST_ENTRY, Entry);
+    Width = ListUi->Right - ListUi->Left - 1;
+
+    ListUi->CurrentItemText[0] = ANSI_NULL;
+    if (ListUi->GetEntryDescriptionProc)
+    {
+        ListUi->GetEntryDescriptionProc(ListEntry,
+                                        ListUi->CurrentItemText,
+                                        ARRAYSIZE(ListUi->CurrentItemText));
+    }
+
+    coPos.X = ListUi->Left + 1;
+    coPos.Y = Row;
+
+    FillConsoleOutputAttribute(StdOutput,
+                               (ListUi->List->CurrentEntry == ListEntry) ?
+                               FOREGROUND_BLUE | BACKGROUND_WHITE :
+                               FOREGROUND_WHITE | BACKGROUND_BLUE,
+                               Width,
+                               coPos,
+                               &Written);
+
+    FillConsoleOutputCharacterA(StdOutput,
+                                ' ',
+                                Width,
+                                coPos,
+                                &Written);
+
+    coPos.X++;
+    WriteConsoleOutputCharacterA(StdOutput,
+                                 ListUi->CurrentItemText,
+                                 min(strlen(ListUi->CurrentItemText), (SIZE_T)Width - 2),
+                                 coPos,
+                                 &Written);
+}
+
+static
 VOID
 DrawScrollBarGenericList(
     IN PGENERIC_LIST_UI ListUi)
@@ -377,25 +457,40 @@ ScrollDownGenericList(
     IN PGENERIC_LIST_UI ListUi)
 {
     PGENERIC_LIST List = ListUi->List;
-    PLIST_ENTRY Entry;
+    PLIST_ENTRY Entry, OldEntry;
+    BOOLEAN WindowScrolled = FALSE;
 
     if (List->CurrentEntry == NULL)
         return;
 
     if (List->CurrentEntry->Entry.Flink != &List->ListHead)
     {
+        OldEntry = &List->CurrentEntry->Entry;
         Entry = List->CurrentEntry->Entry.Flink;
         if (ListUi->LastShown == &List->CurrentEntry->Entry)
         {
             ListUi->FirstShown = ListUi->FirstShown->Flink;
             ListUi->LastShown = ListUi->LastShown->Flink;
+            WindowScrolled = TRUE;
         }
         List->CurrentEntry = CONTAINING_RECORD(Entry, GENERIC_LIST_ENTRY, Entry);
 
         if (ListUi->Redraw)
         {
-            DrawListEntries(ListUi);
-            DrawScrollBarGenericList(ListUi);
+            if (WindowScrolled)
+            {
+                DrawListEntries(ListUi);
+                DrawScrollBarGenericList(ListUi);
+            }
+            else
+            {
+                SHORT Row;
+
+                if (GetVisibleListEntryRow(ListUi, OldEntry, &Row))
+                    DrawListEntry(ListUi, OldEntry, Row);
+                if (GetVisibleListEntryRow(ListUi, Entry, &Row))
+                    DrawListEntry(ListUi, Entry, Row);
+            }
         }
     }
 }
@@ -405,25 +500,40 @@ ScrollUpGenericList(
     IN PGENERIC_LIST_UI ListUi)
 {
     PGENERIC_LIST List = ListUi->List;
-    PLIST_ENTRY Entry;
+    PLIST_ENTRY Entry, OldEntry;
+    BOOLEAN WindowScrolled = FALSE;
 
     if (List->CurrentEntry == NULL)
         return;
 
     if (List->CurrentEntry->Entry.Blink != &List->ListHead)
     {
+        OldEntry = &List->CurrentEntry->Entry;
         Entry = List->CurrentEntry->Entry.Blink;
         if (ListUi->FirstShown == &List->CurrentEntry->Entry)
         {
             ListUi->FirstShown = ListUi->FirstShown->Blink;
             ListUi->LastShown = ListUi->LastShown->Blink;
+            WindowScrolled = TRUE;
         }
         List->CurrentEntry = CONTAINING_RECORD(Entry, GENERIC_LIST_ENTRY, Entry);
 
         if (ListUi->Redraw)
         {
-            DrawListEntries(ListUi);
-            DrawScrollBarGenericList(ListUi);
+            if (WindowScrolled)
+            {
+                DrawListEntries(ListUi);
+                DrawScrollBarGenericList(ListUi);
+            }
+            else
+            {
+                SHORT Row;
+
+                if (GetVisibleListEntryRow(ListUi, OldEntry, &Row))
+                    DrawListEntry(ListUi, OldEntry, Row);
+                if (GetVisibleListEntryRow(ListUi, Entry, &Row))
+                    DrawListEntry(ListUi, Entry, Row);
+            }
         }
     }
 }

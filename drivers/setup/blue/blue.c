@@ -69,7 +69,7 @@ static const VGA_REGISTERS VidpMode3Regs =
 static const UCHAR DefaultPalette[] =
 {
     0, 0, 0,
-    0, 0, 0xC0,
+    0, 0, 0x80,
     0, 0xC0, 0,
     0, 0xC0, 0xC0,
     0xC0, 0, 0,
@@ -414,9 +414,7 @@ ScrAcquireOwnership(
     UCHAR data, value;
     ULONG offset;
     ULONG Index;
-
     _disable();
-
     ScrSetRegisters(&VidpMode3Regs);
 
     /* Disable screen and enable palette access */
@@ -511,7 +509,6 @@ ScrResetScreen(
     {
         DeviceExtension->CursorSize    = 5; /* FIXME: value correct?? */
         DeviceExtension->CursorVisible = TRUE;
-
         if (DeviceExtension->FontBitfield)
         {
             ExFreePoolWithTag(DeviceExtension->FontBitfield, TAG_BLUE);
@@ -1235,6 +1232,44 @@ ScrIoControl(
 
             DeviceExtension->CharAttribute = *(PUSHORT)Irp->AssociatedIrp.SystemBuffer;
 
+            Irp->IoStatus.Information = 0;
+            Status = STATUS_SUCCESS;
+            break;
+        }
+
+        case IOCTL_CONSOLE_CLEAR_SCREEN:
+        {
+            PCONSOLE_CLEAR_SCREEN Buffer;
+            PUCHAR vidmem;
+            ULONG dwCount;
+            ULONG CellCount;
+            UCHAR ch;
+            UCHAR attr;
+
+            if (stk->Parameters.DeviceIoControl.InputBufferLength < sizeof(CONSOLE_CLEAR_SCREEN))
+            {
+                Status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+            ASSERT(Irp->AssociatedIrp.SystemBuffer);
+
+            Buffer = (PCONSOLE_CLEAR_SCREEN)Irp->AssociatedIrp.SystemBuffer;
+            ch = Buffer->cCharacter;
+            attr = (UCHAR)Buffer->wAttribute;
+            CellCount = DeviceExtension->Columns * DeviceExtension->Rows;
+
+            if (DeviceExtension->Enabled && DeviceExtension->VideoMemory)
+            {
+                vidmem = DeviceExtension->VideoMemory;
+
+                for (dwCount = 0; dwCount < CellCount; ++dwCount)
+                {
+                    vidmem[dwCount * 2] = ch;
+                    vidmem[dwCount * 2 + 1] = attr;
+                }
+            }
+
+            DeviceExtension->CharAttribute = Buffer->wAttribute;
             Irp->IoStatus.Information = 0;
             Status = STATUS_SUCCESS;
             break;
