@@ -589,6 +589,77 @@ FillConsoleOutputCharacterA(
     return TRUE;
 }
 
+BOOL
+WINAPI
+ClearConsoleScreen(
+    IN HANDLE hConsoleOutput,
+    IN CHAR cCharacter,
+    IN WORD wAttribute)
+{
+    IO_STATUS_BLOCK IoStatusBlock;
+    CONSOLE_CLEAR_SCREEN Buffer;
+    NTSTATUS Status;
+
+    Buffer.cCharacter = cCharacter;
+    Buffer.wAttribute = wAttribute;
+
+    Status = NtDeviceIoControlFile(hConsoleOutput,
+                                   NULL,
+                                   NULL,
+                                   NULL,
+                                   &IoStatusBlock,
+                                   IOCTL_CONSOLE_CLEAR_SCREEN,
+                                   &Buffer,
+                                   sizeof(Buffer),
+                                   NULL,
+                                   0);
+    return NT_SUCCESS(Status);
+}
+
+BOOL
+WINAPI
+DrawConsoleScreenBuffer(
+    IN HANDLE hConsoleOutput,
+    IN SHORT CursorX,
+    IN SHORT CursorY,
+    IN USHORT SizeX,
+    IN USHORT SizeY,
+    IN const VOID* lpBuffer,
+    IN SIZE_T BufferSize)
+{
+    IO_STATUS_BLOCK IoStatusBlock;
+    PCONSOLE_DRAW Buffer;
+    SIZE_T TotalSize;
+    NTSTATUS Status;
+
+    TotalSize = sizeof(CONSOLE_DRAW) + BufferSize;
+    Buffer = (PCONSOLE_DRAW)RtlAllocateHeap(ProcessHeap, 0, TotalSize);
+    if (!Buffer)
+        return FALSE;
+
+    Buffer->X = 0;
+    Buffer->Y = 0;
+    Buffer->SizeX = SizeX;
+    Buffer->SizeY = SizeY;
+    Buffer->CursorX = CursorX;
+    Buffer->CursorY = CursorY;
+    RtlCopyMemory(Buffer + 1, lpBuffer, BufferSize);
+
+    Status = NtDeviceIoControlFile(hConsoleOutput,
+                                   NULL,
+                                   NULL,
+                                   NULL,
+                                   &IoStatusBlock,
+                                   IOCTL_CONSOLE_DRAW,
+                                   NULL,
+                                   0,
+                                   Buffer,
+                                   (ULONG)TotalSize);
+
+    RtlFreeHeap(ProcessHeap, 0, Buffer);
+    return NT_SUCCESS(Status);
+}
+
 
 BOOL
 WINAPI

@@ -53,6 +53,24 @@
 extern HANDLE StdInput, StdOutput;
 extern SHORT xScreen, yScreen;
 
+BOOL
+WINAPI
+ClearConsoleScreen(
+    IN HANDLE hConsoleOutput,
+    IN CHAR cCharacter,
+    IN WORD wAttribute);
+
+BOOL
+WINAPI
+DrawConsoleScreenBuffer(
+    IN HANDLE hConsoleOutput,
+    IN SHORT CursorX,
+    IN SHORT CursorY,
+    IN USHORT SizeX,
+    IN USHORT SizeY,
+    IN const VOID* lpBuffer,
+    IN SIZE_T BufferSize);
+
 BOOLEAN
 CONSOLE_Init(VOID);
 

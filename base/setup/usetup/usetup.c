@@ -22,7 +22,7 @@
  * FILE:            base/setup/usetup/usetup.c
  * PURPOSE:         Text-mode setup
  * PROGRAMMERS:     Casper S. Hornstrup (chorns@users.sourceforge.net)
- *                  Hervé Poussineau (hpoussin@reactos.org)
+ *                  Herv? Poussineau (hpoussin@reactos.org)
  */
 
 #include <usetup.h>
@@ -707,14 +707,13 @@ LanguagePage(PINPUT_RECORD Ir)
     }
 
     InitGenericListUi(&ListUi, USetupData.LanguageList, GetSettingDescription);
+    MUIDisplayPage(LANGUAGE_PAGE);
     DrawGenericList(&ListUi,
                     2, 18,
                     xScreen - 3,
                     yScreen - 3);
 
     ScrollToPositionGenericList(&ListUi, GetDefaultLanguageIndex());
-
-    MUIDisplayPage(LANGUAGE_PAGE);
 
     while (TRUE)
     {
@@ -786,22 +785,18 @@ LanguagePage(PINPUT_RECORD Ir)
 
             if (wcscmp(SelectedLanguageId, NewLanguageId))
             {
-                /* Clear the language page */
-                MUIClearPage(LANGUAGE_PAGE);
-
                 SelectedLanguageId = NewLanguageId;
 
                 /* Load the font */
                 SetConsoleCodePage();
+
+                MUIDisplayPage(LANGUAGE_PAGE);
 
                 /* Redraw the list */
                 DrawGenericList(&ListUi,
                                 2, 18,
                                 xScreen - 3,
                                 yScreen - 3);
-
-                /* Redraw language selection page in native language */
-                MUIDisplayPage(LANGUAGE_PAGE);
             }
 
             RefreshPage = FALSE;
@@ -4044,7 +4039,6 @@ RunUSetup(VOID)
 
     while (Page != REBOOT_PAGE && Page != RECOVERY_PAGE)
     {
-        CONSOLE_ClearScreen();
         CONSOLE_Flush();
 
         // CONSOLE_SetUnderlinedTextXY(4, 3, " ReactOS " KERNEL_VERSION_STR " Setup ");

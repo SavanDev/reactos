@@ -51,6 +51,194 @@ CHAR CharDoubleUpperRightCorner     = 0xBB; /* double upper right corner */
 CHAR CharDoubleLowerLeftCorner      = 0xC8; /* double lower left corner */
 CHAR CharDoubleLowerRightCorner     = 0xBC; /* double lower right corner */
 
+typedef struct _MUI_SCREEN_CELL
+{
+    CHAR Char;
+    UCHAR Attribute;
+} MUI_SCREEN_CELL, *PMUI_SCREEN_CELL;
+
+static
+VOID
+MUI_InitializeScreenBuffer(
+    _Out_writes_(CellCount) PMUI_SCREEN_CELL Buffer,
+    _In_ SIZE_T CellCount)
+{
+    SIZE_T Index;
+
+    for (Index = 0; Index < CellCount; ++Index)
+    {
+        Buffer[Index].Char = ' ';
+        Buffer[Index].Attribute = FOREGROUND_WHITE | BACKGROUND_BLUE;
+    }
+}
+
+static
+BOOLEAN
+MUI_ComputeTextOrigin(
+    _In_ SHORT X,
+    _In_ SHORT Y,
+    _In_ INT Flags,
+    _In_ SHORT Length,
+    _Out_ PSHORT TextX,
+    _Out_ PSHORT TextY)
+{
+    SHORT DrawX = X;
+    SHORT DrawY = (Flags & TEXT_TYPE_STATUS) ? (yScreen - 1) : Y;
+
+    if (Flags & TEXT_ALIGN_CENTER)
+    {
+        DrawX = (xScreen - Length) / 2;
+    }
+    else if (Flags & TEXT_ALIGN_RIGHT)
+    {
+        DrawX -= Length;
+
+        if (Flags & TEXT_PADDING_SMALL)
+            DrawX -= 1;
+        else if (Flags & TEXT_PADDING_MEDIUM)
+            DrawX -= 2;
+        else if (Flags & TEXT_PADDING_BIG)
+            DrawX -= 3;
+    }
+    else
+    {
+        if (Flags & TEXT_PADDING_SMALL)
+            DrawX += 1;
+        else if (Flags & TEXT_PADDING_MEDIUM)
+            DrawX += 2;
+        else if (Flags & TEXT_PADDING_BIG)
+            DrawX += 3;
+    }
+
+    *TextX = DrawX;
+    *TextY = DrawY;
+    return (DrawY >= 0 && DrawY < yScreen);
+}
+
+static
+VOID
+MUI_FillScreenLine(
+    _Inout_updates_(xScreen * yScreen) PMUI_SCREEN_CELL Buffer,
+    _In_ SHORT Y,
+    _In_ UCHAR Attribute)
+{
+    SHORT X;
+
+    if (Y < 0 || Y >= yScreen)
+        return;
+
+    for (X = 0; X < xScreen; ++X)
+    {
+        SIZE_T Index = (SIZE_T)Y * xScreen + X;
+        Buffer[Index].Char = ' ';
+        Buffer[Index].Attribute = Attribute;
+    }
+}
+
+static
+VOID
+MUI_WriteTextRun(
+    _Inout_updates_(xScreen * yScreen) PMUI_SCREEN_CELL Buffer,
+    _In_ SHORT X,
+    _In_ SHORT Y,
+    _In_ PCSTR Text,
+    _In_ UCHAR Attribute)
+{
+    SHORT CurrentX;
+
+    if (Y < 0 || Y >= yScreen)
+        return;
+
+    for (CurrentX = X; *Text; ++Text, ++CurrentX)
+    {
+        SIZE_T Index;
+
+        if (CurrentX < 0)
+            continue;
+        if (CurrentX >= xScreen)
+            break;
+
+        Index = (SIZE_T)Y * xScreen + CurrentX;
+        Buffer[Index].Char = *Text;
+        Buffer[Index].Attribute = Attribute;
+    }
+}
+
+static
+VOID
+MUI_RenderPageEntry(
+    _Inout_updates_(xScreen * yScreen) PMUI_SCREEN_CELL Buffer,
+    _In_ const MUI_ENTRY* Entry)
+{
+    SHORT TextX, TextY, Length;
+    UCHAR Attribute;
+
+    Length = (SHORT)strlen(Entry->Buffer);
+    if (!MUI_ComputeTextOrigin(Entry->X, Entry->Y, Entry->Flags, Length, &TextX, &TextY))
+        return;
+
+    if (Entry->Flags & TEXT_TYPE_STATUS)
+    {
+        MUI_FillScreenLine(Buffer, TextY, BACKGROUND_WHITE);
+        Attribute = BACKGROUND_WHITE;
+    }
+    else if (Entry->Flags & TEXT_STYLE_HIGHLIGHT)
+    {
+        Attribute = FOREGROUND_WHITE | FOREGROUND_INTENSITY | BACKGROUND_BLUE;
+    }
+    else
+    {
+        Attribute = FOREGROUND_WHITE | BACKGROUND_BLUE;
+    }
+
+    MUI_WriteTextRun(Buffer, TextX, TextY, Entry->Buffer, Attribute);
+
+    if ((Entry->Flags & TEXT_TYPE_STATUS) == 0 &&
+        (Entry->Flags & TEXT_STYLE_UNDERLINE) &&
+        TextY + 1 < yScreen)
+    {
+        SHORT i;
+
+        for (i = 0; i < Length; ++i)
+        {
+            SIZE_T Index;
+            SHORT UnderlineX = TextX + i;
+
+            if (UnderlineX < 0)
+                continue;
+            if (UnderlineX >= xScreen)
+                break;
+
+            Index = (SIZE_T)(TextY + 1) * xScreen + UnderlineX;
+            Buffer[Index].Char = CharDoubleHorizontalLine;
+            Buffer[Index].Attribute = FOREGROUND_WHITE | BACKGROUND_BLUE;
+        }
+    }
+}
+
+static
+VOID
+MUI_RenderPageToConsole(
+    _In_ const MUI_ENTRY* Entry)
+{
+    SIZE_T CellCount;
+    PMUI_SCREEN_CELL Buffer;
+    ULONG Index;
+
+    CellCount = (SIZE_T)xScreen * yScreen;
+    Buffer = RtlAllocateHeap(ProcessHeap, 0, CellCount * sizeof(*Buffer));
+    if (!Buffer)
+        return;
+
+    MUI_InitializeScreenBuffer(Buffer, CellCount);
+
+    for (Index = 0; Entry[Index].Buffer != NULL; ++Index)
+        MUI_RenderPageEntry(Buffer, &Entry[Index]);
+
+    DrawConsoleScreenBuffer(StdOutput, 0, 0, xScreen, yScreen, Buffer, CellCount * sizeof(*Buffer));
+    RtlFreeHeap(ProcessHeap, 0, Buffer);
+}
+
 static
 ULONG
 FindLanguageIndex(VOID)
@@ -171,7 +359,6 @@ MUIDisplayPage(
     IN ULONG page)
 {
     const MUI_ENTRY * entry;
-    ULONG index;
 
     entry = FindMUIEntriesOfPage(page);
     if (!entry)
@@ -183,16 +370,7 @@ MUIDisplayPage(
         return;
     }
 
-    index = 0;
-    while (entry[index].Buffer != NULL)
-    {
-        CONSOLE_SetStyledText(entry[index].X,
-                              entry[index].Y,
-                              entry[index].Flags,
-                              entry[index].Buffer);
-
-        index++;
-    }
+    MUI_RenderPageToConsole(entry);
 }
 
 VOID
