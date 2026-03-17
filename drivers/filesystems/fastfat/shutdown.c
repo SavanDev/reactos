@@ -143,6 +143,7 @@ Return Value:
     PVCB Vcb;
     PIRP NewIrp;
     IO_STATUS_BLOCK Iosb;
+    NTSTATUS FlushStatus;
     BOOLEAN VcbDeleted;
 
     PAGED_CODE();
@@ -215,7 +216,7 @@ Return Value:
 
             _SEH2_TRY {
 
-                (VOID)FatFlushVolume( IrpContext, Vcb, Flush );
+                FlushStatus = FatFlushVolume( IrpContext, Vcb, Flush );
 
                 //
                 //  The volume is now clean, note it.  We purge the
@@ -223,7 +224,8 @@ Return Value:
                 //  clean incase there is a stale Bpb in the cache.
                 //
 
-                if (!FlagOn(Vcb->VcbState, VCB_STATE_FLAG_MOUNTED_DIRTY)) {
+                if (NT_SUCCESS(FlushStatus) &&
+                    !FlagOn(Vcb->VcbState, VCB_STATE_FLAG_MOUNTED_DIRTY)) {
 
                     CcPurgeCacheSection( &Vcb->SectionObjectPointers,
                                          NULL,
@@ -231,6 +233,7 @@ Return Value:
                                          FALSE );
 
                     FatMarkVolume( IrpContext, Vcb, VolumeClean );
+                    ClearFlag( Vcb->VcbState, VCB_STATE_FLAG_VOLUME_DIRTY );
                 }
 
             } _SEH2_EXCEPT( EXCEPTION_EXECUTE_HANDLER ) {

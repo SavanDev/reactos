@@ -163,7 +163,6 @@ static FILE_SYSTEM RegisteredFileSystems[] =
     { L"FAT"  , VfatFormat, VfatChkdsk },
     { L"FAT32", VfatFormat, VfatChkdsk },
 #if 0
-    { L"FATX" , VfatxFormat, VfatxChkdsk },
     { L"NTFS" , NtfsFormat, NtfsChkdsk },
     { L"BTRFS", BtrfsFormat, BtrfsChkdsk },
     { L"EXT2" , Ext2Format, Ext2Chkdsk },

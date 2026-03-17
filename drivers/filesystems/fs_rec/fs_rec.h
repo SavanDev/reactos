@@ -177,7 +177,6 @@ typedef enum _FILE_SYSTEM_TYPE
     FS_TYPE_BTRFS,
     FS_TYPE_REISERFS,
     FS_TYPE_FFS,
-    FS_TYPE_FATX,
 } FILE_SYSTEM_TYPE, *PFILE_SYSTEM_TYPE;
 
 /* FS Recognizer State */
@@ -249,13 +248,6 @@ FsRecReiserfsFsControl(
 NTSTATUS
 NTAPI
 FsRecFfsFsControl(
-    IN PDEVICE_OBJECT DeviceObject,
-    IN PIRP Irp
-);
-
-NTSTATUS
-NTAPI
-FsRecFatxFsControl(
     IN PDEVICE_OBJECT DeviceObject,
     IN PIRP Irp
 );

@@ -25,13 +25,6 @@
 #define DEV_SLAVE(DeviceNumber)   (DeviceNumber)
 #endif
 
-#if defined(SARCH_XBOX)
-/* It's safe to enable the multiple mode */
-#define ATA_ENABLE_MULTIPLE_MODE
-/* nVidia PCI IDE controllers have a 32-bit data port */
-#define ATA_SUPPORT_32_BIT_IO
-#endif
-
 /* Delay of 400ns */
 #if defined(SARCH_PC98)
 #define ATA_IO_WAIT()    WRITE_PORT_UCHAR((PUCHAR)0x5F, 0)

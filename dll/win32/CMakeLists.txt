@@ -220,8 +220,11 @@ add_subdirectory(ucdfs)
 add_subdirectory(ucrtbase)
 add_subdirectory(uext2)
 add_subdirectory(ufat)
+<<<<<<< HEAD
 add_subdirectory(ufatx)
 add_subdirectory(uiautomationcore)
+=======
+>>>>>>> 213a20b506d (storage: remove FATX/xbox paths and harden fastfat cleanup)
 add_subdirectory(untfs)
 add_subdirectory(updspapi)
 add_subdirectory(url)

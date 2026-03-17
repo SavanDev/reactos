@@ -53,7 +53,6 @@ typedef enum _ARCHITECTURE_TYPE
 {
     ARCH_PcAT,      //< Standard BIOS-based PC-AT
     ARCH_NEC98x86,  //< NEC PC-98
-    ARCH_Xbox,      //< Original Xbox
     ARCH_Arc,       //< ARC-based (MIPS, SGI)
     ARCH_Efi,       //< EFI and UEFI
 // Place other architectures supported by the Setup below.

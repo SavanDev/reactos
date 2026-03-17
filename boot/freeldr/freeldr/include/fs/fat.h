@@ -85,17 +85,6 @@ typedef struct _FAT32_BOOTSECTOR
 
 } FAT32_BOOTSECTOR, *PFAT32_BOOTSECTOR;
 
-typedef struct _FATX_BOOTSECTOR
-{
-    CHAR        FileSystemType[4];            /* String "FATX" */
-    ULONG        VolumeSerialNumber;            /* Volume serial number */
-    ULONG        SectorsPerCluster;            /* Number of sectors in a cluster */
-    USHORT        NumberOfFats;                /* Number of FAT tables */
-    ULONG        Unknown;                /* Always 0? */
-    UCHAR        Unused[494];                /* Actually size should be 4078 (boot block is 4096 bytes) */
-
-} FATX_BOOTSECTOR, *PFATX_BOOTSECTOR;
-
 /*
  * Structure of MSDOS directory entry
  */
@@ -127,20 +116,6 @@ typedef struct
     WCHAR    Name11_12[2];        /* Last 2 characters in name */
 } LFN_DIRENTRY, * PLFN_DIRENTRY;
 
-typedef struct
-{
-    UCHAR    FileNameSize;    /* Size of filename (max 42) */
-    UCHAR    Attr;        /* File attributes */
-    CHAR    FileName[42];    /* Filename in ASCII, padded with 0xff (not zero-terminated) */
-    ULONG    StartCluster;    /* Starting cluster number */
-    ULONG    Size;        /* File size */
-    USHORT    Time;        /* Time last modified */
-    USHORT    Date;        /* Date last modified */
-    USHORT    CreateTime;    /* Time file was created */
-    USHORT    CreateDate;    /* Date file was created */
-    USHORT    LastAccessTime;    /* Time file was last accessed */
-    USHORT    LastAccessDate;    /* Date file was last accessed */
-} FATX_DIRENTRY, * PFATX_DIRENTRY;
 #include <poppack.h>
 
 #define FAT_ATTR_NORMAL     0x00
@@ -155,10 +130,6 @@ typedef struct
 #define FAT12   1
 #define FAT16   2
 #define FAT32   3
-#define FATX16  4
-#define FATX32  5
-
-#define ISFATX(FT) ((FT) == FATX16 || (FT) == FATX32)
 
 typedef struct _FAT_VOLUME_INFO *PFAT_VOLUME_INFO;
 

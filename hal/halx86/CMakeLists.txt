@@ -51,11 +51,9 @@ if(ARCH STREQUAL "i386")
     include(pcidata.cmake)
     include(legacy.cmake)
     include(pic.cmake)
-    include(xbox.cmake)
     include(pc98.cmake)
     add_subdirectory(minihal)
 
-    remove_definitions(-DSARCH_XBOX)
     remove_definitions(-DSARCH_PC98)
 
     # hal
@@ -63,7 +61,6 @@ if(ARCH STREQUAL "i386")
     add_hal(halacpi SOURCES acpi/halacpi.rc COMPONENTS generic acpi up pic)
     add_hal(halaacpi SOURCES apic/halaacpi.rc COMPONENTS generic acpi up apic)
     add_hal(halapic SOURCES apic/halapic.rc COMPONENTS generic legacy up apic)
-    add_hal(halxbox SOURCES xbox/halxbox.rc COMPONENTS xbox up)
     add_hal(halpc98 SOURCES pc98/halpc98.rc COMPONENTS pc98 up)
 
     add_hal(halmacpi SOURCES smp/halmacpi.rc COMPONENTS generic acpi smp apic)

@@ -297,12 +297,15 @@ HalpReportResourceUsage(IN PUNICODE_STRING HalName,
         HalpComIoSpace.Next = HalpAddressUsageList;
         HalpAddressUsageList = &HalpComIoSpace;
 
+<<<<<<< HEAD
 #if defined(SARCH_XBOX)
         /*
          * Do not claim interrupt resources for the KD COM port.
          * The actual COM port lacks SERIRQ, IRQ 4 is hardwired to the NIC.
          */
 #else
+=======
+>>>>>>> 213a20b506d (storage: remove FATX/xbox paths and harden fastfat cleanup)
         /* Use the debug port table if we have one */
         HalpGetInfoFromACPI = HalpGetDebugPortTable();
 
@@ -327,7 +330,6 @@ HalpReportResourceUsage(IN PUNICODE_STRING HalName,
                 }
             }
         }
-#endif
     }
 
     /* On non-ACPI systems, we need to build an address map */

@@ -1,7 +1,15 @@
 
+<<<<<<< HEAD
 # EFI platform ID - Used for naming the EFI boot image on supported platforms.
 if(ARCH STREQUAL "i386")
     if(NOT (SARCH STREQUAL "pc98" OR SARCH STREQUAL "xbox"))
+=======
+# EFI platform ID, used in environ/CMakelists.txt for bootmgfw filename naming also.
+if(ARCH STREQUAL "amd64")
+    set(EFI_PLATFORM_ID "x64")
+elseif(ARCH STREQUAL "i386")
+    if(NOT (SARCH STREQUAL "pc98"))
+>>>>>>> 213a20b506d (storage: remove FATX/xbox paths and harden fastfat cleanup)
         set(EFI_PLATFORM_ID "ia32")
     endif()
 elseif(ARCH STREQUAL "amd64")
