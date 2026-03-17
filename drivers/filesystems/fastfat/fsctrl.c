@@ -7575,6 +7575,8 @@ Return Value:
 
 --*/
 {
+    NTSTATUS FlushStatus = STATUS_SUCCESS;
+
     PAGED_CODE();
 
     //
@@ -7591,7 +7593,7 @@ Return Value:
 
     if (FlushType != NoFlush) {
 
-        (VOID) FatFlushVolume( IrpContext, Vcb, FlushType );
+        FlushStatus = FatFlushVolume( IrpContext, Vcb, FlushType );
     }
 
     FatCloseEaFile( IrpContext, Vcb, FALSE );
@@ -7635,7 +7637,7 @@ Return Value:
         (VOID)KeRemoveQueueDpc( &Vcb->CleanVolumeDpc );
 
 
-        if (FlushType != NoFlush) {
+        if ((FlushType != NoFlush) && NT_SUCCESS(FlushStatus)) {
 
             //
             //  The volume is now clean, note it.

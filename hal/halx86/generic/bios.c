@@ -641,7 +641,7 @@ BOOLEAN
 NTAPI
 HalpBiosDisplayReset(VOID)
 {
-#if defined(SARCH_XBOX) || defined(SARCH_PC98)
+#if defined(SARCH_PC98)
     /* There is no VGA BIOS on these machine types */
     return FALSE;
 #else

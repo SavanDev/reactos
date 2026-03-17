@@ -194,27 +194,6 @@ GetDefaultClusterSize(LPWSTR szFs, PDWORD pClusterSize, PULARGE_INTEGER TotalNum
         else
             return FALSE;
     }
-    else if (!_wcsicmp(szFs, L"FATX"))
-    {
-        if (TotalNumberOfBytes->QuadPart <= (16 * 1024 * 1024))
-            ClusterSize = 2048;
-        else if (TotalNumberOfBytes->QuadPart <= (32 * 1024 * 1024))
-            ClusterSize = 512;
-        else if (TotalNumberOfBytes->QuadPart <= (64 * 1024 * 1024))
-            ClusterSize = 1024;
-        else if (TotalNumberOfBytes->QuadPart <= (128 * 1024 * 1024))
-            ClusterSize = 2048;
-        else if (TotalNumberOfBytes->QuadPart <= (256 * 1024 * 1024))
-            ClusterSize = 4096;
-        else if (TotalNumberOfBytes->QuadPart <= (8192LL * 1024LL * 1024LL))
-            ClusterSize = 2048;
-        else if (TotalNumberOfBytes->QuadPart <= (16384LL * 1024LL * 1024LL))
-            ClusterSize = 8192;
-        else if (TotalNumberOfBytes->QuadPart <= (32768LL * 1024LL * 1024LL))
-            ClusterSize = 16384;
-        else
-            return FALSE;
-    }
     else if (!_wcsicmp(szFs, L"NTFS"))
     {
         if (TotalNumberOfBytes->QuadPart <= (512 * 1024 * 1024))
@@ -275,10 +254,6 @@ InsertDefaultClusterSizeForFs(HWND hwndDlg, PFORMAT_DRIVE_CONTEXT pContext)
     {
         pwszFsSizeLimit = L"32GB";
     }
-    else if (!_wcsicmp(wszBuf, L"FATX"))
-    {
-        pwszFsSizeLimit = L"1GB/32GB";
-    }
     else if (!_wcsicmp(wszBuf, L"NTFS"))
     {
         pwszFsSizeLimit = L"256TB";
@@ -295,7 +270,6 @@ InsertDefaultClusterSizeForFs(HWND hwndDlg, PFORMAT_DRIVE_CONTEXT pContext)
     if (!_wcsicmp(wszBuf, L"FAT16") ||
         !_wcsicmp(wszBuf, L"FAT") || // REACTOS HACK
         !_wcsicmp(wszBuf, L"FAT32") ||
-        !_wcsicmp(wszBuf, L"FATX") ||
         !_wcsicmp(wszBuf, L"NTFS") ||
         !_wcsicmp(wszBuf, L"EXT2") ||
         !_wcsicmp(wszBuf, L"BtrFS"))

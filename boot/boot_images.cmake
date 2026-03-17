@@ -1,7 +1,7 @@
 
 # EFI platform ID - Used for naming the EFI boot image on supported platforms.
 if(ARCH STREQUAL "i386")
-    if(NOT (SARCH STREQUAL "pc98" OR SARCH STREQUAL "xbox"))
+    if(NOT (SARCH STREQUAL "pc98"))
         set(EFI_PLATFORM_ID "ia32")
     endif()
 elseif(ARCH STREQUAL "amd64")

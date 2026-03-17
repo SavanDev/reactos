@@ -60,7 +60,6 @@ DiskReadBootRecord(
 
 #include "part_mbr.c"
 #include "part_gpt.c"
-#include "part_brfr.c"
 
 VOID
 DiskDetectPartitionType(
@@ -105,14 +104,6 @@ DiskDetectPartitionType(
         return;
     }
 
-    /* Probe for Xbox-BRFR partitioning */
-    if (DiskIsBrfr(DriveNumber))
-    {
-        DiskPartitionType[DriveNumber] = PARTITION_STYLE_BRFR;
-        TRACE("Drive 0x%X partition type Xbox-BRFR\n", DriveNumber);
-        return;
-    }
-
     /* Failed to detect partitions, assume non-partitioned disk */
     DiskPartitionType[DriveNumber] = PARTITION_STYLE_RAW;
     TRACE("Drive 0x%X partition type unknown\n", DriveNumber);
@@ -148,21 +139,6 @@ DiskGetBootPartitionEntry(
         case PARTITION_STYLE_RAW:
         {
             FIXME("DiskGetBootPartitionEntry() unimplemented for RAW\n");
-            return FALSE;
-        }
-        case PARTITION_STYLE_BRFR:
-        {
-            PARTITION_INFORMATION TempPartitionEntry;
-            if (!PartitionEntry)
-                PartitionEntry = &TempPartitionEntry;
-            if (DiskGetBrfrPartitionEntry(DriveNumber,
-                                          512, // Geometry.BytesPerSector
-                                          FATX_DATA_PARTITION,
-                                          PartitionEntry))
-            {
-                *BootPartition = FATX_DATA_PARTITION;
-                return TRUE;
-            }
             return FALSE;
         }
         default:
@@ -215,13 +191,6 @@ DiskGetPartitionEntry(
         {
             FIXME("DiskGetPartitionEntry() unimplemented for RAW\n");
             return FALSE;
-        }
-        case PARTITION_STYLE_BRFR:
-        {
-            return DiskGetBrfrPartitionEntry(DriveNumber,
-                                             512, // SectorSize
-                                             PartitionNumber,
-                                             PartitionEntry);
         }
         default:
         {
