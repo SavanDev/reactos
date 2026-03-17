@@ -58,6 +58,8 @@ enum  {
 };
 #undef FCIDM_SHVIEWLAST // Don't use this constant, change DVIDM_CONTEXTMENU_LAST if you need a new id.
 
+#define SHV_DESKTOP_INITIAL_REFRESH (WM_USER + 0x1113)
+
 struct LISTVIEW_SORT_INFO
 {
     INT8    Direction;
@@ -279,6 +281,7 @@ private:
     bool                      m_isFullStatusBar;
     bool                      m_ScheduledStatusbarUpdate;
     bool                      m_HasCutItems;
+    bool                      m_DesktopInitialRefreshPending;
 
     CLSID m_Category;
     BOOL  m_Destroyed;
@@ -506,6 +509,7 @@ public:
     LRESULT OnNotify(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT OnChangeNotify(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT OnUpdateStatusbar(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
+    LRESULT OnDesktopInitialRefresh(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT OnMenuMessage(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT OnSettingChange(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT OnInitMenuPopup(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
@@ -556,6 +560,7 @@ public:
     MESSAGE_HANDLER(WM_COMMAND, OnCommand)
     MESSAGE_HANDLER(SHV_CHANGE_NOTIFY, OnChangeNotify)
     MESSAGE_HANDLER(SHV_UPDATESTATUSBAR, OnUpdateStatusbar)
+    MESSAGE_HANDLER(SHV_DESKTOP_INITIAL_REFRESH, OnDesktopInitialRefresh)
     MESSAGE_HANDLER(WM_CONTEXTMENU, OnContextMenu)
     MESSAGE_HANDLER(WM_DRAWITEM, OnMenuMessage)
     MESSAGE_HANDLER(WM_MEASUREITEM, OnMenuMessage)
@@ -622,6 +627,7 @@ CDefView::CDefView() :
     m_isFullStatusBar(true),
     m_ScheduledStatusbarUpdate(false),
     m_HasCutItems(false),
+    m_DesktopInitialRefreshPending(false),
     m_Destroyed(FALSE)
 {
     ZeroMemory(&m_FolderSettings, sizeof(m_FolderSettings));
@@ -839,6 +845,19 @@ LRESULT CDefView::OnUpdateStatusbar(UINT uMsg, WPARAM wParam, LPARAM lParam, BOO
 {
     m_ScheduledStatusbarUpdate = false;
     UpdateStatusbar();
+    return 0;
+}
+
+LRESULT CDefView::OnDesktopInitialRefresh(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
+{
+    if (m_DesktopInitialRefreshPending && IsDesktop() && m_ListView.IsWindow())
+    {
+        m_DesktopInitialRefreshPending = false;
+        UpdateListColors();
+        LV_RefreshIcons();
+        m_ListView.RedrawWindow(NULL, NULL,
+                                RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+    }
     return 0;
 }
 
@@ -1501,9 +1520,10 @@ void CDefView::LV_RefreshIcon(INT iItem)
 {
     ASSERT(m_ListView);
 
-    LVITEMW lvItem = { LVIF_IMAGE };
+    LVITEMW lvItem = { LVIF_IMAGE | LVIF_TEXT };
     lvItem.iItem = iItem;
     lvItem.iImage = I_IMAGECALLBACK;
+    lvItem.pszText = LPSTR_TEXTCALLBACKW;
     m_ListView.SetItem(&lvItem);
     m_ListView.Update(iItem);
 }
@@ -1627,7 +1647,14 @@ HRESULT CDefView::FillList(BOOL IsRefreshCommand)
 
     UpdateListColors();
 
-    if (!(m_FolderSettings.fFlags & FWF_DESKTOP))
+    if (m_FolderSettings.fFlags & FWF_DESKTOP)
+    {
+        if (!IsRefreshCommand)
+        {
+            m_DesktopInitialRefreshPending = true;
+        }
+    }
+    else
     {
         // redraw now
         m_ListView.InvalidateRect(NULL, TRUE);
@@ -1645,6 +1672,10 @@ LRESULT CDefView::OnShowWindow(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bH
 {
     if (m_ListView.IsWindow())
         m_ListView.UpdateWindow();
+
+    if (wParam && m_DesktopInitialRefreshPending && IsDesktop())
+        PostMessage(SHV_DESKTOP_INITIAL_REFRESH, 0, 0);
+
     bHandled = FALSE;
     return 0;
 }

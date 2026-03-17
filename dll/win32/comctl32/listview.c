@@ -8809,6 +8809,11 @@ static DWORD LISTVIEW_SetExtendedListViewStyle(LISTVIEW_INFO *infoPtr, DWORD mas
             LISTVIEW_SetBkColor(infoPtr, CLR_NONE);
     }
 
+    if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_TRANSPARENTSHADOWTEXT)
+    {
+        LISTVIEW_InvalidateRect(infoPtr, NULL);
+    }
+
     if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_HEADERINALLVIEWS)
     {
         if (infoPtr->dwLvExStyle & LVS_EX_HEADERINALLVIEWS)
@@ -9320,7 +9325,11 @@ static BOOL LISTVIEW_SetTextBkColor(LISTVIEW_INFO *infoPtr, COLORREF color)
 {
     TRACE("(color=%x)\n", color);
 
+    if (infoPtr->clrTextBk == color)
+        return TRUE;
+
     infoPtr->clrTextBk = color;
+    LISTVIEW_InvalidateRect(infoPtr, NULL);
     return TRUE;
 }
 
@@ -9340,7 +9349,11 @@ static BOOL LISTVIEW_SetTextColor (LISTVIEW_INFO *infoPtr, COLORREF color)
 {
     TRACE("(color=%x)\n", color);
 
+    if (infoPtr->clrText == color)
+        return TRUE;
+
     infoPtr->clrText = color;
+    LISTVIEW_InvalidateRect(infoPtr, NULL);
     return TRUE;
 }
 
