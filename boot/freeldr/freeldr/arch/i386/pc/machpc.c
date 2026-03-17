@@ -100,9 +100,6 @@ typedef struct _PNP_DOCK_INFO
 } PNP_DOCK_INFO, *PPNP_DOCK_INFO;
 #include <poppack.h>
 
-/* FIXME: Abstract things better so we don't need to place define here */
-#if !defined(SARCH_XBOX)
-
 VOID
 PcGetExtendedBIOSData(PULONG ExtendedBIOSDataArea, PULONG ExtendedBIOSDataSize)
 {
@@ -124,8 +121,7 @@ PcGetExtendedBIOSData(PULONG ExtendedBIOSDataArea, PULONG ExtendedBIOSDataSize)
     }
 }
 
-// NOTE: Similar to machxbox.c!XboxGetHarddiskConfigurationData(),
-// but with extended geometry support.
+// Similar to the historical Xbox path, but with extended geometry support.
 static
 PCM_PARTIAL_RESOURCE_LIST
 PcGetHarddiskConfigurationData(UCHAR DriveNumber, ULONG* pSize)
@@ -379,8 +375,6 @@ DetectPnpBios(PCONFIGURATION_COMPONENT_DATA SystemKey, ULONG *BusNumber)
 
     (*BusNumber)++;
 }
-
-#endif // !SARCH_XBOX
 
 static
 VOID
@@ -707,8 +701,6 @@ DetectSerialPointerPeripheral(PCONFIGURATION_COMPONENT_DATA ControllerKey,
     }
 }
 
-/* FIXME: Abstract things better so we don't need to place define here */
-#if !defined(SARCH_XBOX)
 static
 ULONG
 PcGetSerialPort(ULONG Index, PULONG Irq)
@@ -726,7 +718,6 @@ PcGetSerialPort(ULONG Index, PULONG Irq)
 
     return (ULONG) *(BasePtr + Index);
 }
-#endif // !SARCH_XBOX
 
 /*
  * Parse the serial mouse detection options.
@@ -875,9 +866,6 @@ DetectSerialPorts(
         ControllerNumber++;
     }
 }
-
-/* FIXME: Abstract things better so we don't need to place define here */
-#if !defined(SARCH_XBOX)
 
 static VOID
 DetectParallelPorts(PCONFIGURATION_COMPONENT_DATA BusKey)
@@ -1761,13 +1749,8 @@ VOID __cdecl ChainLoadBiosBootSectorCode(
                     0x0000, 0x7C00);
 }
 
-#endif // !SARCH_XBOX
-
-
 /******************************************************************************/
 
-/* FIXME: Abstract things better so we don't need to place define here */
-#if !defined(SARCH_XBOX)
 VOID
 MachInit(const char *CmdLine)
 {
@@ -1813,6 +1796,5 @@ PcPrepareForReactOS(VOID)
     PcVideoPrepareForReactOS();
     DiskStopFloppyMotor();
 }
-#endif
 
 /* EOF */

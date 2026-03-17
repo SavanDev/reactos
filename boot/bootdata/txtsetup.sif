@@ -235,7 +235,6 @@ acpi_up = "ACPI PC Uniprocessor"
 acpi_mp = "ACPI PC Multiprocessor"
 apic_up = "Standard APIC PC Uniprocessor"
 aacpi_up = "ACPI APIC PC Uniprocessor"
-xbox = "Original Xbox (x86 based)"
 pc98_up = "NEC PC-98 Uniprocessor"
 
 [Computer.NTamd64]
@@ -250,7 +249,6 @@ acpi_up = "ACPI UP"
 acpi_mp = "ACPI MP"
 apic_up = "APIC UP"
 aacpi_up = "AAPIC UP"
-xbox = "Xbox"
 pc98_up = "NEC PC-98 UP"
 
 [Map.Computer.NTamd64]
@@ -280,11 +278,6 @@ halapic.dll  = 1,,,,,,,2,,,hal.dll,1,2
 [Files.aacpi_up]
 ntoskrnl.exe = 1,,,,,,,2,,,,1,2
 halaacpi.dll  = 1,,,,,,,2,,,hal.dll,1,2
-
-[Files.xbox]
-ntoskrnl.exe = 1,,,,,,,2,,,,1,2
-halxbox.dll  = 1,,,,,,,2,,,hal.dll,1,2
-vfatfs.sys   = 1,,,,,,,4,,,,1,4
 
 [Files.pc98_up]
 ntoskrnl.exe = 1,,,,,,,2,,,,1,2
@@ -325,13 +318,11 @@ vbe_1600x1200x8  = "VESA Display (1600x1200x8)",,vga,1600,1200,8
 vbe_1600x1200x16 = "VESA Display (1600x1200x16)",,vga,1600,1200,16
 vbe_1600x1200x24 = "VESA Display (1600x1200x24)",,vga,1600,1200,24
 vbe_1600x1200x32 = "VESA Display (1600x1200x32)",,vga,1600,1200,32
-xbox             = "Original Xbox NV2A Framebuffer (640x480x32)",,XboxVmp,640,480,32
 
 [Map.Display]
 ;<id> = <pnp id string>
 vga = "VGA Display"
 vbe = "VBE Display"
-xbox = "NV2A Framebuffer"
 
 [Keyboard]
 Default = "XT-, AT- or extended keyboard (83-105 keys)"

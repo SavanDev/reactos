@@ -2,7 +2,10 @@
 if(ARCH STREQUAL "i386")
     set(SARCH "pc" CACHE STRING
     "Sub-architecture to build for. Specify one of:
-     pc pc98 xbox")
+     pc pc98")
+    if(SARCH STREQUAL "xbox")
+        message(FATAL_ERROR "The xbox sub-architecture has been removed from this fork. Use SARCH=pc or SARCH=pc98.")
+    endif()
 elseif(ARCH STREQUAL "amd64")
     set(SARCH "" CACHE STRING
     "Sub-architecture to build for.")
@@ -93,7 +96,7 @@ else()
 endif()
 
 cmake_dependent_option(ISAPNP_ENABLE "Whether to enable the ISA PnP support." ON
-                       "ARCH STREQUAL i386 AND NOT SARCH STREQUAL xbox" OFF)
+                       "ARCH STREQUAL i386" OFF)
 
 set(GENERATE_DEPENDENCY_GRAPH FALSE CACHE BOOL
 "Whether to create a GraphML dependency graph of DLLs.")
@@ -113,5 +116,17 @@ endif()
 set(USE_DUMMY_PSEH FALSE CACHE BOOL
 "Whether to disable PSEH support.")
 
+option(NT5_STRICT
+"Whether to strictly target NT5.x exports only (up to 0x502)."
+OFF)
+
 set(DLL_EXPORT_VERSION "0x502" CACHE STRING
 "The NT version the user mode DLLs target.")
+
+if(NT5_STRICT)
+    if(DLL_EXPORT_VERSION GREATER 0x502)
+        message(FATAL_ERROR
+            "NT5_STRICT is enabled, but DLL_EXPORT_VERSION is ${DLL_EXPORT_VERSION}. "
+            "Set DLL_EXPORT_VERSION to 0x502 (or lower).")
+    endif()
+endif()

@@ -398,8 +398,8 @@ Return Value:
             VcbAcquired = TRUE;
 
             //
-            //  Mark the volume clean and then flush the volume file,
-            //  and then all directories
+            //  Flush the volume file and all directories before
+            //  attempting to clear the dirty state.
             //
 
             Status = FatFlushVolume( IrpContext, Vcb, Flush );
@@ -422,7 +422,8 @@ Return Value:
                 //  The volume is now clean, note it.
                 //
 
-                if (!FlagOn(Vcb->VcbState, VCB_STATE_FLAG_MOUNTED_DIRTY)) {
+                if (NT_SUCCESS(Status) &&
+                    !FlagOn(Vcb->VcbState, VCB_STATE_FLAG_MOUNTED_DIRTY)) {
 
                     FatMarkVolume( IrpContext, Vcb, VolumeClean );
                     ClearFlag( Vcb->VcbState, VCB_STATE_FLAG_VOLUME_DIRTY );

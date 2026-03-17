@@ -37,7 +37,7 @@ DBG_DEFAULT_CHANNEL(MEMORY);
 BIOS_MEMORY_MAP PcBiosMemoryMap[MAX_BIOS_DESCRIPTORS];
 ULONG PcBiosMapCount;
 
-#if !defined(SARCH_XBOX) && !defined(SARCH_PC98)
+#if !defined(SARCH_PC98)
 static FREELDR_MEMORY_DESCRIPTOR PcMemoryMap[MAX_BIOS_DESCRIPTORS + 1];
 #endif
 ULONG PcMapCount;
@@ -51,7 +51,7 @@ AddMemoryDescriptor(
     IN TYPE_OF_MEMORY MemoryType);
 
 /* FIXME: Abstract things better so we don't need to place define here */
-#if !defined(SARCH_XBOX) && !defined(SARCH_PC98)
+#if !defined(SARCH_PC98)
 
 static
 BOOLEAN
@@ -485,7 +485,7 @@ nextRange:
     return PcBiosMapCount;
 }
 
-#endif // !SARCH_XBOX && !SARCH_PC98
+#endif // !SARCH_PC98
 
 VOID
 ReserveMemory(
@@ -603,7 +603,7 @@ PcMemFinalizeMemoryMap(
 }
 
 /* FIXME: Abstract things better so we don't need to place define here */
-#if !defined(SARCH_XBOX) && !defined(SARCH_PC98)
+#if !defined(SARCH_PC98)
 
 PFREELDR_MEMORY_DESCRIPTOR
 PcMemGetMemoryMap(ULONG *MemoryMapSize)
@@ -671,6 +671,6 @@ PcMemGetMemoryMap(ULONG *MemoryMapSize)
     return PcMemoryMap;
 }
 
-#endif // !SARCH_XBOX && !SARCH_PC98
+#endif // !SARCH_PC98
 
 /* EOF */

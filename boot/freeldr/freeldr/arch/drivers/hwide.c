@@ -26,8 +26,6 @@ static const IDE_REG AtapChannelBaseArray[] =
 {
 #if defined(SARCH_PC98)
     0x640
-#elif defined(SARCH_XBOX)
-    0x1F0
 #else
     0x1F0, 0x170, 0x1E8, 0x168
 #endif

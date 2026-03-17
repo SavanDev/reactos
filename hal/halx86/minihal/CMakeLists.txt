@@ -21,13 +21,7 @@ list(APPEND MINI_HAL_SOURCE
     ../include/hal.h
     halinit.c)
 
-if(SARCH STREQUAL "xbox")
-    list(APPEND MINI_HAL_SOURCE
-        ../generic/beep.c
-        ../generic/cmos.c
-        ../xbox/clock.c
-        ../xbox/reboot.c)
-elseif(SARCH STREQUAL "pc98")
+if(SARCH STREQUAL "pc98")
     list(APPEND MINI_HAL_SOURCE
         ../pc98/beep.c
         ../pc98/clock.c
