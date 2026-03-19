@@ -145,6 +145,14 @@ class CStartMenuSettingsPage : public CPropertyPageImpl<CStartMenuSettingsPage>
 private:
     HBITMAP m_hbmpStartBitmap;
 
+    void _CheckStartMenuRadio(UINT nSelected)
+    {
+        ::CheckRadioButton(m_hWnd,
+                           IDC_TASKBARPROP_STARTMENU,
+                           IDC_TASKBARPROP_STARTMENUCLASSIC,
+                           nSelected);
+    }
+
     void _UpdateDialog()
     {
         HWND hwndCustomizeClassic = GetDlgItem(IDC_TASKBARPROP_STARTMENUCLASSICCUST);
@@ -159,7 +167,7 @@ private:
         if (policyNoSimpleStartMenu)
         {
             /* Switch to classic */
-            CheckDlgButton(IDC_TASKBARPROP_STARTMENUCLASSIC, BST_CHECKED);
+            _CheckStartMenuRadio(IDC_TASKBARPROP_STARTMENUCLASSIC);
 
             /* Disable radio button */
             ::EnableWindow(hwndModernRadioBtn, FALSE);
@@ -172,10 +180,11 @@ private:
         /* If no restrictions, then get bModern from dialog */
         else
         {
-            bModern = IsDlgButtonChecked(IDC_TASKBARPROP_STARTMENU);
+            bModern = (IsDlgButtonChecked(IDC_TASKBARPROP_STARTMENU) == BST_CHECKED);
         }
 
-        ::EnableWindow(hwndCustomizeModern, bModern);
+        /* The modern customize UI resources exist, but the pages are not wired up yet. */
+        ::EnableWindow(hwndCustomizeModern, FALSE);
         ::EnableWindow(hwndCustomizeClassic, !bModern);
 
         UINT uImageId = bModern ? IDB_STARTPREVIEW : IDB_STARTPREVIEW_CLASSIC;
@@ -187,6 +196,8 @@ public:
 
     BEGIN_MSG_MAP(CTaskBarSettingsPage)
         MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
+        COMMAND_ID_HANDLER(IDC_TASKBARPROP_STARTMENU, OnStartMenuStyleChanged)
+        COMMAND_ID_HANDLER(IDC_TASKBARPROP_STARTMENUCLASSIC, OnStartMenuStyleChanged)
         COMMAND_ID_HANDLER(IDC_TASKBARPROP_STARTMENUCLASSICCUST, OnStartMenuCustomize)
         CHAIN_MSG_MAP(CPropertyPageImpl<CStartMenuSettingsPage>)
     END_MSG_MAP()
@@ -205,7 +216,7 @@ public:
     LRESULT OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
     {
         BOOL modern = SHELL_GetSetting(SSF_STARTPANELON, fStartPanelOn);
-        CheckDlgButton(modern ? IDC_TASKBARPROP_STARTMENU : IDC_TASKBARPROP_STARTMENUCLASSIC, BST_CHECKED);
+        _CheckStartMenuRadio(modern ? IDC_TASKBARPROP_STARTMENU : IDC_TASKBARPROP_STARTMENUCLASSIC);
         _UpdateDialog();
         return TRUE;
     }
@@ -216,10 +227,18 @@ public:
         return 0;
     }
 
+    LRESULT OnStartMenuStyleChanged(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL &bHandled)
+    {
+        _CheckStartMenuRadio(wID);
+        _UpdateDialog();
+        SetModified(TRUE);
+        return 0;
+    }
+
     int OnApply()
     {
         SHELLSTATE ss;
-        ss.fStartPanelOn = !IsDlgButtonChecked(IDC_TASKBARPROP_STARTMENUCLASSIC);
+        ss.fStartPanelOn = (IsDlgButtonChecked(IDC_TASKBARPROP_STARTMENU) == BST_CHECKED);
         SHGetSetSettings(&ss, SSF_STARTPANELON, TRUE);
         return PSNRET_NOERROR;
     }

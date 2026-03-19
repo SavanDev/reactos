@@ -45,6 +45,11 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(CMenuDeskBar);
 
+#define STARTPANEL_HEADER_HEIGHT 32
+#define STARTPANEL_MIN_WIDTH     300
+#define STARTPANEL_HEADER_DARK   RGB(11, 63, 155)
+#define STARTPANEL_HEADER_LIGHT  RGB(74, 137, 220)
+
 CMenuDeskBar::CMenuDeskBar() :
     m_Client(NULL),
     m_ClientWindow(NULL),
@@ -58,6 +63,21 @@ CMenuDeskBar::CMenuDeskBar() :
 
 CMenuDeskBar::~CMenuDeskBar()
 {
+}
+
+BOOL CMenuDeskBar::_IsStartPanelLayout() const
+{
+    CComPtr<ITrayPriv> trayPriv;
+
+    if (!SHELL_GetSetting(SSF_STARTPANELON, fStartPanelOn) || m_Site.p == NULL)
+        return FALSE;
+
+    return SUCCEEDED(m_Site->QueryInterface(IID_PPV_ARG(ITrayPriv, &trayPriv)));
+}
+
+UINT CMenuDeskBar::_GetStartPanelHeaderHeight() const
+{
+    return _IsStartPanelLayout() ? STARTPANEL_HEADER_HEIGHT : 0;
 }
 
 LRESULT CMenuDeskBar::_OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
@@ -357,11 +377,18 @@ HRESULT STDMETHODCALLTYPE CMenuDeskBar::Popup(POINTL *ppt, RECTL *prcExclude, MP
     ::AdjustWindowRect(&rc, ::GetWindowLong(m_hWnd, GWL_STYLE), FALSE);
     ::OffsetRect(&rc, -rc.left, -rc.top);
 
-    if (m_Banner != NULL)
+    if (m_Banner != NULL && !_IsStartPanelLayout())
     {
         BITMAP bm;
         ::GetObject(m_Banner, sizeof(bm), &bm);
         rc.right += bm.bmWidth;
+    }
+
+    if (_IsStartPanelLayout())
+    {
+        rc.bottom += _GetStartPanelHeaderHeight();
+        if ((rc.right - rc.left) < STARTPANEL_MIN_WIDTH)
+            rc.right = rc.left + STARTPANEL_MIN_WIDTH;
     }
 
     RECT rcWorkArea;
@@ -685,7 +712,11 @@ LRESULT CMenuDeskBar::_OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHa
 
         GetClientRect(&rc);
 
-        if (m_Banner && m_IconSize != BMICON_SMALL)
+        if (_IsStartPanelLayout())
+        {
+            rc.top += _GetStartPanelHeaderHeight();
+        }
+        else if (m_Banner && m_IconSize != BMICON_SMALL)
         {
             BITMAP bm;
             ::GetObject(m_Banner, sizeof(bm), &bm);
@@ -723,6 +754,55 @@ LRESULT CMenuDeskBar::_OnNotify(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &b
 LRESULT CMenuDeskBar::_OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
 {
     bHandled = FALSE;
+
+    if (_IsStartPanelLayout())
+    {
+        WCHAR szUser[128];
+        RECT rc, rcHeader, rcText;
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(&ps);
+        HBRUSH hbrHeader = CreateSolidBrush(STARTPANEL_HEADER_DARK);
+        HBRUSH hbrAccent = CreateSolidBrush(STARTPANEL_HEADER_LIGHT);
+        HFONT hFont = NULL, hFontOld;
+        LOGFONTW lf;
+        DWORD cchUser = _countof(szUser);
+
+        GetClientRect(&rc);
+        rcHeader = rc;
+        rcHeader.bottom = min(rc.bottom, (LONG)_GetStartPanelHeaderHeight());
+        FillRect(hdc, &rcHeader, hbrHeader);
+
+        rcText = rcHeader;
+        rcText.left += 12;
+        rcText.right -= 12;
+
+        RECT rcAccent = rcHeader;
+        rcAccent.left = max(rcAccent.left, rcAccent.right - 72);
+        FillRect(hdc, &rcAccent, hbrAccent);
+
+        if (!GetUserNameW(szUser, &cchUser))
+            szUser[0] = UNICODE_NULL;
+
+        if (GetObjectW(GetStockObject(DEFAULT_GUI_FONT), sizeof(lf), &lf) == sizeof(lf))
+        {
+            lf.lfWeight = FW_BOLD;
+            lf.lfHeight = -15;
+            hFont = CreateFontIndirectW(&lf);
+        }
+
+        hFontOld = (HFONT)SelectObject(hdc, hFont ? hFont : GetStockObject(DEFAULT_GUI_FONT));
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        DrawTextW(hdc, szUser, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        SelectObject(hdc, hFontOld);
+
+        if (hFont)
+            DeleteObject(hFont);
+        DeleteObject(hbrAccent);
+        DeleteObject(hbrHeader);
+        EndPaint(&ps);
+        return TRUE;
+    }
 
     if (m_Banner && !m_IconSize)
     {

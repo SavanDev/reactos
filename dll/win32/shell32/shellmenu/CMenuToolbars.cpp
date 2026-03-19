@@ -30,6 +30,247 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(CMenuToolbars);
 
+#define STARTPANEL_SHELL_BG  RGB(255, 255, 255)
+#define STARTPANEL_STATIC_BG RGB(232, 228, 218)
+#define STARTPANEL_HOT_BG    RGB(49, 106, 197)
+#define STARTPANEL_PINNED_LIMIT 2
+#define STARTPANEL_RECENT_LIMIT 4
+#define STARTPANEL_MAX_REG_BUF (MAX_PATH * 8)
+#define STARTPANEL_CMD_BASE    0x6000
+
+static const WCHAR s_szStartPanelKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartPanel";
+static const WCHAR s_szPinnedPrograms[] = L"PinnedPrograms";
+static const WCHAR s_szRecentPrograms[] = L"RecentPrograms";
+
+struct STARTPANEL_ITEMDATA
+{
+    BOOL bCustomPath;
+    LPITEMIDLIST pidl;
+    WCHAR szPath[MAX_PATH];
+};
+
+static STARTPANEL_ITEMDATA* CreatePidlItemData(LPITEMIDLIST pidl)
+{
+    STARTPANEL_ITEMDATA* pData = new STARTPANEL_ITEMDATA;
+    if (!pData)
+    {
+        ILFree(pidl);
+        return NULL;
+    }
+
+    pData->bCustomPath = FALSE;
+    pData->pidl = pidl;
+    pData->szPath[0] = UNICODE_NULL;
+    return pData;
+}
+
+static STARTPANEL_ITEMDATA* CreateCustomPathItemData(LPCWSTR pszPath)
+{
+    STARTPANEL_ITEMDATA* pData = new STARTPANEL_ITEMDATA;
+    if (!pData)
+        return NULL;
+
+    pData->bCustomPath = TRUE;
+    pData->pidl = NULL;
+    StringCchCopyW(pData->szPath, _countof(pData->szPath), pszPath);
+    return pData;
+}
+
+static void DestroyItemData(STARTPANEL_ITEMDATA* pData)
+{
+    if (!pData)
+        return;
+
+    if (!pData->bCustomPath && pData->pidl)
+        ILFree(pData->pidl);
+
+    delete pData;
+}
+
+static BOOL LoadStartPanelProgramList(LPCWSTR pszValueName, WCHAR Entries[][MAX_PATH], UINT cEntries, BOOL *pbExists = NULL)
+{
+    BYTE Buffer[sizeof(WCHAR) * STARTPANEL_MAX_REG_BUF];
+    DWORD cbSize = sizeof(Buffer);
+    DWORD dwType = 0;
+    LSTATUS Status;
+    LPCWSTR pszValue;
+    UINT Count = 0;
+
+    if (pbExists)
+        *pbExists = FALSE;
+
+    Status = SHGetValueW(HKEY_CURRENT_USER, s_szStartPanelKey, pszValueName, &dwType, Buffer, &cbSize);
+    if (Status != ERROR_SUCCESS || dwType != REG_MULTI_SZ || cbSize < sizeof(WCHAR))
+        return FALSE;
+
+    if (pbExists)
+        *pbExists = TRUE;
+
+    pszValue = reinterpret_cast<LPCWSTR>(Buffer);
+    while (*pszValue && Count < cEntries)
+    {
+        StringCchCopyW(Entries[Count], MAX_PATH, pszValue);
+        ++Count;
+        pszValue += lstrlenW(pszValue) + 1;
+    }
+
+    return Count;
+}
+
+static BOOL SaveStartPanelProgramList(LPCWSTR pszValueName, WCHAR Entries[][MAX_PATH], UINT Count)
+{
+    WCHAR Buffer[STARTPANEL_MAX_REG_BUF];
+    WCHAR *pCurrent = Buffer;
+    size_t cchRemaining = _countof(Buffer);
+    UINT i;
+
+    ZeroMemory(Buffer, sizeof(Buffer));
+
+    for (i = 0; i < Count; ++i)
+    {
+        size_t cchEntry = lstrlenW(Entries[i]) + 1;
+        if (cchEntry > cchRemaining)
+            break;
+
+        CopyMemory(pCurrent, Entries[i], cchEntry * sizeof(WCHAR));
+        pCurrent += cchEntry;
+        cchRemaining -= cchEntry;
+    }
+
+    if (cchRemaining == 0)
+        return FALSE;
+
+    *pCurrent = UNICODE_NULL;
+    return SHSetValueW(HKEY_CURRENT_USER, s_szStartPanelKey, pszValueName,
+                       REG_MULTI_SZ, Buffer,
+                       static_cast<DWORD>((pCurrent - Buffer + 1) * sizeof(WCHAR))) == ERROR_SUCCESS;
+}
+
+static BOOL PathInProgramList(WCHAR Entries[][MAX_PATH], UINT Count, LPCWSTR pszPath)
+{
+    UINT i;
+
+    for (i = 0; i < Count; ++i)
+    {
+        if (lstrcmpiW(Entries[i], pszPath) == 0)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static UINT SeedDefaultPinnedPrograms(WCHAR Entries[][MAX_PATH], UINT cEntries)
+{
+    static const LPCWSTR s_DefaultExecutables[] =
+    {
+        L"iexplore.exe",
+        L"notepad.exe",
+        L"mspaint.exe",
+        L"explorer.exe",
+        L"cmd.exe",
+    };
+
+    WCHAR szPath[MAX_PATH];
+    UINT Count = 0;
+    UINT i;
+
+    for (i = 0; i < _countof(s_DefaultExecutables) && Count < cEntries; ++i)
+    {
+        if (SearchPathW(NULL, s_DefaultExecutables[i], NULL, _countof(szPath), szPath, NULL) == 0)
+            continue;
+
+        if (PathInProgramList(Entries, Count, szPath))
+            continue;
+
+        StringCchCopyW(Entries[Count], MAX_PATH, szPath);
+        ++Count;
+    }
+
+    return Count;
+}
+
+static UINT SeedDefaultRecentPrograms(WCHAR Entries[][MAX_PATH], UINT cEntries,
+                                      WCHAR PinnedEntries[][MAX_PATH], UINT PinnedCount)
+{
+    static const LPCWSTR s_DefaultExecutables[] =
+    {
+        L"explorer.exe",
+        L"mspaint.exe",
+        L"calc.exe",
+        L"cmd.exe",
+        L"notepad.exe",
+    };
+
+    WCHAR szPath[MAX_PATH];
+    UINT Count = 0;
+    UINT i;
+
+    for (i = 0; i < _countof(s_DefaultExecutables) && Count < cEntries; ++i)
+    {
+        if (SearchPathW(NULL, s_DefaultExecutables[i], NULL, _countof(szPath), szPath, NULL) == 0)
+            continue;
+
+        if (PathInProgramList(PinnedEntries, PinnedCount, szPath) ||
+            PathInProgramList(Entries, Count, szPath))
+        {
+            continue;
+        }
+
+        StringCchCopyW(Entries[Count], MAX_PATH, szPath);
+        ++Count;
+    }
+
+    return Count;
+}
+
+static BOOL UpdateRecentProgramList(LPCWSTR pszPath)
+{
+    WCHAR Entries[STARTPANEL_RECENT_LIMIT][MAX_PATH] = { { 0 } };
+    WCHAR Updated[STARTPANEL_RECENT_LIMIT][MAX_PATH] = { { 0 } };
+    UINT Count, i, j;
+
+    if (!pszPath || !*pszPath)
+        return FALSE;
+
+    Count = LoadStartPanelProgramList(s_szRecentPrograms, Entries, _countof(Entries));
+    StringCchCopyW(Updated[0], MAX_PATH, pszPath);
+
+    for (i = 0, j = 1; i < Count && j < _countof(Updated); ++i)
+    {
+        if (lstrcmpiW(Entries[i], pszPath) == 0)
+            continue;
+
+        StringCchCopyW(Updated[j], MAX_PATH, Entries[i]);
+        ++j;
+    }
+
+    return SaveStartPanelProgramList(s_szRecentPrograms, Updated, min(j, _countof(Updated)));
+}
+
+static INT GetPathIconIndex(LPCWSTR pszPath)
+{
+    SHFILEINFOW sfi = { 0 };
+
+    if (SHGetFileInfoW(pszPath, 0, &sfi, sizeof(sfi), SHGFI_SYSICONINDEX | SHGFI_SMALLICON))
+        return sfi.iIcon;
+
+    return 0;
+}
+
+static void GetPathDisplayName(LPCWSTR pszPath, LPWSTR pszText, UINT cchText)
+{
+    SHFILEINFOW sfi = { 0 };
+
+    if (SHGetFileInfoW(pszPath, 0, &sfi, sizeof(sfi), SHGFI_DISPLAYNAME) && sfi.szDisplayName[0])
+    {
+        StringCchCopyW(pszText, cchText, sfi.szDisplayName);
+        return;
+    }
+
+    StringCchCopyW(pszText, cchText, PathFindFileNameW(pszPath));
+    PathRemoveExtensionW(pszText);
+}
+
 // FIXME: Enable if/when wine comctl supports this flag properly
 #define USE_TBSTYLE_EX_VERTICAL 0
 
@@ -150,6 +391,34 @@ HRESULT CMenuToolbarBase::OnPagerCalcSize(LPNMPGCALCSIZE csize)
     return S_OK;
 }
 
+BOOL CMenuToolbarBase::UseStartPanelColumnColors() const
+{
+    return m_menuBand != NULL && m_menuBand->IsStartPanelLayout();
+}
+
+COLORREF CMenuToolbarBase::GetStartPanelColumnColor() const
+{
+    return IsStartPanelShellColumn() ? STARTPANEL_SHELL_BG : STARTPANEL_STATIC_BG;
+}
+
+LRESULT CMenuToolbarBase::OnEraseBackground(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
+{
+    if (!UseStartPanelColumnColors())
+    {
+        bHandled = FALSE;
+        return 0;
+    }
+
+    RECT rc;
+    HDC hdc = reinterpret_cast<HDC>(wParam);
+    HBRUSH bgBrush = CreateSolidBrush(GetStartPanelColumnColor());
+
+    GetClientRect(&rc);
+    FillRect(hdc, &rc, bgBrush);
+    DeleteObject(bgBrush);
+    return 1;
+}
+
 HRESULT CMenuToolbarBase::OnCustomDraw(LPNMTBCUSTOMDRAW cdraw, LRESULT * theResult)
 {
     bool     isHot, isPopup, isActive;
@@ -190,23 +459,31 @@ HRESULT CMenuToolbarBase::OnCustomDraw(LPNMTBCUSTOMDRAW cdraw, LRESULT * theResu
                 cdraw->nmcd.uItemState |= CDIS_HOT;
 
                 clrText = GetSysColor(COLOR_HIGHLIGHTTEXT);
-                bgBrush = GetSysColorBrush(m_useFlatMenus ? COLOR_MENUHILIGHT : COLOR_HIGHLIGHT);
+                if (UseStartPanelColumnColors())
+                    bgBrush = CreateSolidBrush(STARTPANEL_HOT_BG);
+                else
+                    bgBrush = GetSysColorBrush(m_useFlatMenus ? COLOR_MENUHILIGHT : COLOR_HIGHLIGHT);
             }
             else
             {
                 clrText = GetSysColor(COLOR_MENUTEXT);
-                bgBrush = GetSysColorBrush(COLOR_MENU);
+                if (UseStartPanelColumnColors())
+                    bgBrush = CreateSolidBrush(GetStartPanelColumnColor());
+                else
+                    bgBrush = GetSysColorBrush(COLOR_MENU);
             }
 
             // Paint the background color with the selected color
             FillRect(hdc, &rc, bgBrush);
+            if (UseStartPanelColumnColors())
+                DeleteObject(bgBrush);
 
             // Set the text color in advance, this color will be assigned when the ITEMPOSTPAINT triggers
             SetTextColor(hdc, clrText);
 
             // Set the text color, will be used by the internal drawing code
             cdraw->clrText = clrText;
-            cdraw->iListGap += 4;
+            cdraw->iListGap += UseStartPanelColumnColors() ? 6 : 4;
 
             // Tell the default drawing code we don't want any fanciness, not even a background.
             *theResult = CDRF_NOTIFYPOSTPAINT | TBCDRF_NOBACKGROUND | TBCDRF_NOEDGES | TBCDRF_NOOFFSET | TBCDRF_NOMARK | 0x00800000; // FIXME: the last bit is Vista+, useful for debugging only
@@ -1369,31 +1646,34 @@ static BOOL IsPidlPrograms(LPCITEMIDLIST pidlTarget)
 HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
 {
     HRESULT hr;
-
     CComPtr<IEnumIDList> eidl;
+    HDPA dpaSort;
+    LPITEMIDLIST item = NULL;
+    BOOL StartMenuAdminTools;
+    BOOL bMustHideAdminTools;
+    BOOL bTopLevelStartPanel;
+    WCHAR szAdminTools[MAX_PATH];
+    UINT CommandId = STARTPANEL_CMD_BASE;
+
     hr = m_shellFolder->EnumObjects(GetToolbar(), SHCONTF_FOLDERS | SHCONTF_NONFOLDERS, &eidl);
     if (FAILED_UNEXPECTEDLY(hr))
         return hr;
 
-    HDPA dpaSort = DPA_Create(10);
+    dpaSort = DPA_Create(10);
+    if (!dpaSort)
+        return E_OUTOFMEMORY;
 
-    LPITEMIDLIST item = NULL;
     hr = eidl->Next(1, &item, NULL);
     while (hr == S_OK)
     {
         if (m_menuBand->_CallCBWithItemPidl(item, 0x10000000, 0, 0) == S_FALSE)
-        {
             DPA_AppendPtr(dpaSort, item);
-        }
         else
-        {
             CoTaskMemFree(item);
-        }
 
         hr = eidl->Next(1, &item, NULL);
     }
 
-    // If no items were added, show the "empty" placeholder
     if (DPA_GetPtrCount(dpaSort) == 0)
     {
         DPA_Destroy(dpaSort);
@@ -1402,28 +1682,205 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
 
     TRACE("FillToolbar added %d items to the DPA\n", DPA_GetPtrCount(dpaSort));
 
-    DPA_Sort(dpaSort, PidlListSort, (LPARAM) m_shellFolder.p);
+    DPA_Sort(dpaSort, PidlListSort, (LPARAM)m_shellFolder.p);
 
-    BOOL StartMenuAdminTools = SHRegGetBoolUSValueW(
+    StartMenuAdminTools = SHRegGetBoolUSValueW(
         L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
         L"StartMenuAdminTools", FALSE, TRUE);
+    bMustHideAdminTools = IsPidlPrograms(m_idList) && !StartMenuAdminTools;
+    bTopLevelStartPanel = m_menuBand->IsStartPanelLayout() && !IsPidlPrograms(m_idList);
 
-    BOOL bMustHideAdminTools = IsPidlPrograms(m_idList) && !StartMenuAdminTools;
     TRACE("StartMenuAdminTools: %d\n", StartMenuAdminTools);
     TRACE("bMustHideAdminTools: %d\n", bMustHideAdminTools);
 
-    WCHAR szAdminTools[MAX_PATH];
     if (bMustHideAdminTools)
     {
         LoadStringW(GetModuleHandleW(L"shell32.dll"), IDS_ADMINISTRATIVETOOLS,
                     szAdminTools, _countof(szAdminTools));
     }
 
-    for (int i = 0; i<DPA_GetPtrCount(dpaSort);)
+    if (bTopLevelStartPanel)
     {
-        item = (LPITEMIDLIST)DPA_GetPtr(dpaSort, i);
+        WCHAR PinnedPrograms[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
+        WCHAR RecentPrograms[STARTPANEL_RECENT_LIMIT][MAX_PATH] = { { 0 } };
+        BOOL bPinnedExists = FALSE;
+        UINT PinnedCount;
+        UINT RecentCount;
+        UINT RecentVisibleCount = 0;
+        UINT AddedCount = 0;
+        LPITEMIDLIST pidlPrograms = NULL;
 
+        PinnedCount = LoadStartPanelProgramList(s_szPinnedPrograms, PinnedPrograms, _countof(PinnedPrograms), &bPinnedExists);
+        if (!bPinnedExists || PinnedCount == 0)
+        {
+            PinnedCount = SeedDefaultPinnedPrograms(PinnedPrograms, _countof(PinnedPrograms));
+            if (PinnedCount > 0)
+                SaveStartPanelProgramList(s_szPinnedPrograms, PinnedPrograms, PinnedCount);
+        }
+
+        RecentCount = LoadStartPanelProgramList(s_szRecentPrograms, RecentPrograms, _countof(RecentPrograms));
+        if (RecentCount == 0)
+        {
+            RecentCount = SeedDefaultRecentPrograms(RecentPrograms, _countof(RecentPrograms),
+                                                    PinnedPrograms, PinnedCount);
+            if (RecentCount > 0)
+                SaveStartPanelProgramList(s_szRecentPrograms, RecentPrograms, RecentCount);
+        }
+
+        for (UINT i = 0; i < RecentCount; ++i)
+        {
+            if (RecentPrograms[i][0] && !PathInProgramList(PinnedPrograms, PinnedCount, RecentPrograms[i]))
+                ++RecentVisibleCount;
+        }
+
+        for (UINT i = 0; i < PinnedCount; ++i)
+        {
+            STARTPANEL_ITEMDATA *pData;
+            WCHAR szText[MAX_PATH];
+
+            if (!PinnedPrograms[i][0])
+                continue;
+
+            pData = CreateCustomPathItemData(PinnedPrograms[i]);
+            if (!pData)
+                continue;
+
+            GetPathDisplayName(PinnedPrograms[i], szText, _countof(szText));
+            hr = AddButton(CommandId++, szText, FALSE, GetPathIconIndex(PinnedPrograms[i]),
+                           reinterpret_cast<DWORD_PTR>(pData), FALSE);
+            if (FAILED(hr))
+            {
+                DestroyItemData(pData);
+                DPA_Destroy(dpaSort);
+                return hr;
+            }
+
+            ++AddedCount;
+        }
+
+        if (AddedCount > 0 && RecentVisibleCount > 0)
+            AddSeparator(FALSE);
+
+        for (UINT i = 0; i < RecentCount; ++i)
+        {
+            STARTPANEL_ITEMDATA *pData;
+            WCHAR szText[MAX_PATH];
+
+            if (!RecentPrograms[i][0] || PathInProgramList(PinnedPrograms, PinnedCount, RecentPrograms[i]))
+                continue;
+
+            pData = CreateCustomPathItemData(RecentPrograms[i]);
+            if (!pData)
+                continue;
+
+            GetPathDisplayName(RecentPrograms[i], szText, _countof(szText));
+            hr = AddButton(CommandId++, szText, FALSE, GetPathIconIndex(RecentPrograms[i]),
+                           reinterpret_cast<DWORD_PTR>(pData), FALSE);
+            if (FAILED(hr))
+            {
+                DestroyItemData(pData);
+                DPA_Destroy(dpaSort);
+                return hr;
+            }
+
+            ++AddedCount;
+        }
+
+        for (INT i = 0; i < DPA_GetPtrCount(dpaSort); ++i)
+        {
+            item = static_cast<LPITEMIDLIST>(DPA_GetPtr(dpaSort, i));
+            if (item && IsPidlPrograms(item))
+            {
+                pidlPrograms = item;
+                DPA_DeletePtr(dpaSort, i);
+                break;
+            }
+        }
+
+        if (AddedCount > 0 && pidlPrograms != NULL)
+            AddSeparator(FALSE);
+
+        if (pidlPrograms)
+        {
+            STRRET sr = { STRRET_CSTR };
+            PWSTR MenuString = NULL;
+            INT indexOpen = 0;
+            INT index;
+            LPCITEMIDLIST itemc = pidlPrograms;
+            SFGAOF attrs = SFGAO_FOLDER;
+            STARTPANEL_ITEMDATA *pData;
+
+            hr = m_shellFolder->GetDisplayNameOf(pidlPrograms, SIGDN_NORMALDISPLAY, &sr);
+            if (FAILED_UNEXPECTEDLY(hr))
+            {
+                DPA_Destroy(dpaSort);
+                ILFree(pidlPrograms);
+                return hr;
+            }
+
+            hr = StrRetToStr(&sr, NULL, &MenuString);
+            if (FAILED_UNEXPECTEDLY(hr))
+            {
+                DPA_Destroy(dpaSort);
+                ILFree(pidlPrograms);
+                return hr;
+            }
+
+            index = SHMapPIDLToSystemImageListIndex(m_shellFolder, pidlPrograms, &indexOpen);
+            hr = m_shellFolder->GetAttributesOf(1, &itemc, &attrs);
+            if (FAILED_UNEXPECTEDLY(hr))
+            {
+                CoTaskMemFree(MenuString);
+                DPA_Destroy(dpaSort);
+                ILFree(pidlPrograms);
+                return hr;
+            }
+
+            pData = CreatePidlItemData(pidlPrograms);
+            if (!pData)
+            {
+                CoTaskMemFree(MenuString);
+                DPA_Destroy(dpaSort);
+                ILFree(pidlPrograms);
+                return E_OUTOFMEMORY;
+            }
+
+            hr = AddButton(CommandId++, MenuString, attrs & SFGAO_FOLDER, index,
+                           reinterpret_cast<DWORD_PTR>(pData), TRUE);
+            CoTaskMemFree(MenuString);
+            if (FAILED(hr))
+            {
+                DestroyItemData(pData);
+                DPA_Destroy(dpaSort);
+                return hr;
+            }
+
+            ++AddedCount;
+        }
+
+        for (INT i = 0; i < DPA_GetPtrCount(dpaSort); ++i)
+            ILFree(static_cast<LPITEMIDLIST>(DPA_GetPtr(dpaSort, i)));
+
+        DPA_Destroy(dpaSort);
+
+        if (AddedCount == 0)
+            return AddPlaceholder();
+
+        return S_OK;
+    }
+
+    for (INT i = 0; i < DPA_GetPtrCount(dpaSort);)
+    {
+        STARTPANEL_ITEMDATA *pData;
         STRRET sr = { STRRET_CSTR };
+        PWSTR MenuString;
+        INT indexOpen = 0;
+        INT index;
+        LPCITEMIDLIST itemc;
+        SFGAOF attrs = SFGAO_FOLDER;
+
+        item = static_cast<LPITEMIDLIST>(DPA_GetPtr(dpaSort, i));
+
         hr = m_shellFolder->GetDisplayNameOf(item, SIGDN_NORMALDISPLAY, &sr);
         if (FAILED_UNEXPECTEDLY(hr))
         {
@@ -1431,36 +1888,54 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
             return hr;
         }
 
-        PWSTR MenuString;
-        StrRetToStr(&sr, NULL, &MenuString);
+        hr = StrRetToStr(&sr, NULL, &MenuString);
+        if (FAILED_UNEXPECTEDLY(hr))
+        {
+            DPA_Destroy(dpaSort);
+            return hr;
+        }
 
         if (bMustHideAdminTools && lstrcmpiW(MenuString, szAdminTools) == 0)
         {
             ++i;
+            ILFree(item);
             CoTaskMemFree(MenuString);
             continue;
         }
 
-        INT indexOpen = 0;
-        INT index = SHMapPIDLToSystemImageListIndex(m_shellFolder, item, &indexOpen);
-
-        LPCITEMIDLIST itemc = item;
-
-        SFGAOF attrs = SFGAO_FOLDER;
+        index = SHMapPIDLToSystemImageListIndex(m_shellFolder, item, &indexOpen);
+        itemc = item;
         hr = m_shellFolder->GetAttributesOf(1, &itemc, &attrs);
+        if (FAILED_UNEXPECTEDLY(hr))
+        {
+            CoTaskMemFree(MenuString);
+            DPA_Destroy(dpaSort);
+            return hr;
+        }
 
-        DWORD_PTR dwData = reinterpret_cast<DWORD_PTR>(item);
+        pData = CreatePidlItemData(item);
+        if (!pData)
+        {
+            CoTaskMemFree(MenuString);
+            DPA_Destroy(dpaSort);
+            return E_OUTOFMEMORY;
+        }
 
-        // Fetch next item already, so we know if the current one is the last
-        i++;
+        ++i;
 
-        AddButton(i, MenuString, attrs & SFGAO_FOLDER, index, dwData, i >= DPA_GetPtrCount(dpaSort));
-
+        hr = AddButton(CommandId++, MenuString, attrs & SFGAO_FOLDER, index,
+                       reinterpret_cast<DWORD_PTR>(pData), i >= DPA_GetPtrCount(dpaSort));
         CoTaskMemFree(MenuString);
+        if (FAILED(hr))
+        {
+            DestroyItemData(pData);
+            DPA_Destroy(dpaSort);
+            return hr;
+        }
     }
 
     DPA_Destroy(dpaSort);
-    return hr;
+    return S_OK;
 }
 
 HRESULT CMenuSFToolbar::InternalGetTooltip(INT iItem, INT index, DWORD_PTR dwData, LPWSTR pszText, INT cchTextMax)
@@ -1472,7 +1947,7 @@ HRESULT CMenuSFToolbar::InternalGetTooltip(INT iItem, INT index, DWORD_PTR dwDat
 
 HRESULT CMenuSFToolbar::OnDeletingButton(const NMTOOLBAR * tb)
 {
-    ILFree(reinterpret_cast<LPITEMIDLIST>(tb->tbButton.dwData));
+    DestroyItemData(reinterpret_cast<STARTPANEL_ITEMDATA*>(tb->tbButton.dwData));
     return S_OK;
 }
 
@@ -1525,7 +2000,13 @@ HRESULT CMenuSFToolbar::InternalContextMenu(INT iItem, INT index, DWORD_PTR dwDa
 {
     HRESULT hr;
     CComPtr<IContextMenu> contextMenu = NULL;
-    LPCITEMIDLIST pidl = reinterpret_cast<LPCITEMIDLIST>(dwData);
+    STARTPANEL_ITEMDATA *pData = reinterpret_cast<STARTPANEL_ITEMDATA*>(dwData);
+    LPCITEMIDLIST pidl;
+
+    if (!pData || pData->bCustomPath || !pData->pidl)
+        return S_FALSE;
+
+    pidl = pData->pidl;
 
     hr = m_shellFolder->GetUIObjectOf(GetToolbar(), 1, &pidl, IID_NULL_PPV_ARG(IContextMenu, &contextMenu));
     if (FAILED_UNEXPECTEDLY(hr))
@@ -1540,7 +2021,32 @@ HRESULT CMenuSFToolbar::InternalContextMenu(INT iItem, INT index, DWORD_PTR dwDa
 
 HRESULT CMenuSFToolbar::InternalExecuteItem(INT iItem, INT index, DWORD_PTR data)
 {
-    return m_menuBand->_CallCBWithItemPidl(reinterpret_cast<LPITEMIDLIST>(data), SMC_SFEXEC, 0, 0);
+    STARTPANEL_ITEMDATA *pData = reinterpret_cast<STARTPANEL_ITEMDATA*>(data);
+
+    if (!pData)
+        return E_FAIL;
+
+    if (pData->bCustomPath)
+    {
+        UpdateRecentProgramList(pData->szPath);
+        return reinterpret_cast<INT_PTR>(ShellExecuteW(NULL, NULL, pData->szPath, NULL, NULL, SW_SHOWNORMAL)) > 32 ? S_OK : E_FAIL;
+    }
+
+    if (pData->pidl)
+    {
+        WCHAR szPath[MAX_PATH];
+        LPCITEMIDLIST pidl = pData->pidl;
+        SFGAOF attrs = SFGAO_FOLDER;
+
+        if (SUCCEEDED(m_shellFolder->GetAttributesOf(1, &pidl, &attrs)) &&
+            !(attrs & SFGAO_FOLDER) &&
+            SHGetPathFromIDListW(pData->pidl, szPath))
+        {
+            UpdateRecentProgramList(szPath);
+        }
+    }
+
+    return m_menuBand->_CallCBWithItemPidl(pData->pidl, SMC_SFEXEC, 0, 0);
 }
 
 HRESULT CMenuSFToolbar::InternalPopupItem(INT iItem, INT index, DWORD_PTR dwData, BOOL keyInitiated)
@@ -1552,10 +2058,13 @@ HRESULT CMenuSFToolbar::InternalPopupItem(INT iItem, INT index, DWORD_PTR dwData
     CComPtr<IShellMenuCallback> psmc;
     CComPtr<IShellMenu> shellMenu;
 
-    LPITEMIDLIST pidl = reinterpret_cast<LPITEMIDLIST>(dwData);
+    STARTPANEL_ITEMDATA *pData = reinterpret_cast<STARTPANEL_ITEMDATA*>(dwData);
+    LPITEMIDLIST pidl;
 
-    if (!pidl)
+    if (!pData || pData->bCustomPath || !pData->pidl)
         return E_FAIL;
+
+    pidl = pData->pidl;
 
     hr = CMenuBand_CreateInstance(IID_PPV_ARG(IShellMenu, &shellMenu));
     if (FAILED_UNEXPECTEDLY(hr))
@@ -1583,7 +2092,13 @@ HRESULT CMenuSFToolbar::InternalPopupItem(INT iItem, INT index, DWORD_PTR dwData
 HRESULT CMenuSFToolbar::InternalHasSubMenu(INT iItem, INT index, DWORD_PTR dwData)
 {
     HRESULT hr;
-    LPCITEMIDLIST pidl = reinterpret_cast<LPITEMIDLIST>(dwData);
+    STARTPANEL_ITEMDATA *pData = reinterpret_cast<STARTPANEL_ITEMDATA*>(dwData);
+    LPCITEMIDLIST pidl;
+
+    if (!pData || pData->bCustomPath || !pData->pidl)
+        return S_FALSE;
+
+    pidl = pData->pidl;
 
     SFGAOF attrs = SFGAO_FOLDER;
     hr = m_shellFolder->GetAttributesOf(1, &pidl, &attrs);

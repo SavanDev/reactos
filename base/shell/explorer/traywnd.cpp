@@ -2440,7 +2440,10 @@ ChangePos:
         if (m_DesktopWnd)
             ::SendMessageW(m_DesktopWnd, uMsg, wParam, lParam);
 
-        if (m_StartMenuPopup && lstrcmpiW((LPCWSTR)lParam, L"TraySettings") == 0)
+        if (m_StartMenuPopup &&
+            lParam != 0 &&
+            (lstrcmpiW((LPCWSTR)lParam, L"TraySettings") == 0 ||
+             lstrcmpiW((LPCWSTR)lParam, L"ShellState") == 0))
         {
             HideStartMenu();
 
