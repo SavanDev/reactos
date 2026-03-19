@@ -68,6 +68,14 @@ CMenuBand::~CMenuBand()
         DestroyMenu(m_hmenu);
 }
 
+BOOL CMenuBand::IsStartPanelLayout() const
+{
+    return (m_dwFlags & (SMINIT_TOPLEVEL | SMINIT_VERTICAL)) == (SMINIT_TOPLEVEL | SMINIT_VERTICAL) &&
+           m_staticToolbar != NULL &&
+           m_SFToolbar != NULL &&
+           SHELL_GetSetting(SSF_STARTPANELON, fStartPanelOn);
+}
+
 HRESULT STDMETHODCALLTYPE  CMenuBand::Initialize(
     IShellMenuCallback *psmc,
     UINT uId,
@@ -288,6 +296,38 @@ HRESULT STDMETHODCALLTYPE CMenuBand::OnPosRectChangeDB(RECT *prc)
     if (m_staticToolbar == NULL && m_SFToolbar == NULL)
         return E_FAIL;
 
+    if (IsStartPanelLayout())
+    {
+        const int cxGap = 1;
+        const int cxPadding = 16;
+        int cx = prc->right - prc->left;
+        int cy = prc->bottom - prc->top;
+        int cxAvail = max(0, cx - cxGap);
+        int cxShell = maxShlFld.cx + cxPadding;
+        int cxStatic = maxStatic.cx + cxPadding;
+        int cxIdeal = max(1, cxShell + cxStatic);
+
+        if (cxIdeal > cxAvail && cxAvail > 0)
+            cxShell = MulDiv(cxAvail, cxShell, cxIdeal);
+
+        cxShell = min(cxShell, cxAvail);
+        cxStatic = cxAvail - cxShell;
+
+        if (cxAvail > 1 && cxStatic < 1)
+        {
+            cxStatic = 1;
+            cxShell = cxAvail - cxStatic;
+        }
+
+        if (m_SFToolbar)
+            m_SFToolbar->SetPosSize(prc->left, prc->top, cxShell, cy);
+
+        if (m_staticToolbar)
+            m_staticToolbar->SetPosSize(prc->left + cxShell + cxGap, prc->top, cxStatic, cy);
+
+        return S_OK;
+    }
+
     int sy = min(prc->bottom - prc->top, maxStatic.cy + maxShlFld.cy);
 
     int syStatic = maxStatic.cy;
@@ -366,7 +406,18 @@ HRESULT STDMETHODCALLTYPE  CMenuBand::GetBandInfo(
     if (m_staticToolbar == NULL && m_SFToolbar == NULL)
         return E_FAIL;
 
-    if (m_dwFlags & SMINIT_VERTICAL)
+    if ((m_dwFlags & SMINIT_VERTICAL) && IsStartPanelLayout())
+    {
+        const int cxGap = 1;
+        const int cxPadding = 16;
+
+        pdbi->ptMinSize.x = minStatic.cx + minShlFld.cx + cxPadding + cxGap;
+        pdbi->ptMinSize.y = max(minStatic.cy, minShlFld.cy);
+        pdbi->ptMaxSize.x = maxStatic.cx + maxShlFld.cx + cxPadding + cxGap;
+        pdbi->ptMaxSize.y = max(maxStatic.cy, maxShlFld.cy);
+        pdbi->dwModeFlags = DBIMF_VARIABLEHEIGHT;
+    }
+    else if (m_dwFlags & SMINIT_VERTICAL)
     {
         pdbi->ptMinSize.x = max(minStatic.cx, minShlFld.cx) + 20;
         pdbi->ptMinSize.y = minStatic.cy + minShlFld.cy;

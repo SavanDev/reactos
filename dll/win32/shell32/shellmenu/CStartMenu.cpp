@@ -47,6 +47,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(CStartMenu);
 #define IDM_NETWORKCONNECTIONS      557
 #define IDM_DISCONNECT              5000
 #define IDM_SECURITY                5001
+#define IDM_MYMUSIC                 5002
+#define IDM_MYCOMPUTER              5003
 
 /*
  * TODO:
@@ -90,6 +92,16 @@ private:
         if (FAILED_UNEXPECTEDLY(hr))
             return hr;
 
+        if (SHELL_GetSetting(SSF_STARTPANELON, fStartPanelOn))
+        {
+            HMENU hStartPanel = CreateStartPanelMenu(hmenu);
+            if (hStartPanel)
+            {
+                DestroyMenu(hmenu);
+                hmenu = hStartPanel;
+            }
+        }
+
         hr = m_pShellMenu->SetMenu(hmenu, NULL, SMSET_BOTTOM);
         if (FAILED_UNEXPECTEDLY(hr))
         {
@@ -98,6 +110,113 @@ private:
         }
 
         return hr;
+    }
+
+    static BOOL GetMenuItemText(HMENU hMenu, UINT uId, LPWSTR pszText, UINT cchText)
+    {
+        MENUITEMINFOW mii = { sizeof(mii) };
+
+        if (!hMenu || !pszText || cchText == 0)
+            return FALSE;
+
+        mii.fMask = MIIM_STRING;
+        mii.dwTypeData = pszText;
+        mii.cch = cchText;
+        if (!GetMenuItemInfoW(hMenu, uId, FALSE, &mii))
+            return FALSE;
+        return TRUE;
+    }
+
+    static HMENU GetSubMenuByCommand(HMENU hMenu, UINT uId)
+    {
+        MENUITEMINFOW mii = { sizeof(mii) };
+        mii.fMask = MIIM_SUBMENU;
+        return (hMenu && GetMenuItemInfoW(hMenu, uId, FALSE, &mii)) ? mii.hSubMenu : NULL;
+    }
+
+    static BOOL AppendSeparatorIfNeeded(HMENU hMenu)
+    {
+        MENUITEMINFOW mii = { sizeof(mii) };
+        INT count;
+
+        if (!hMenu)
+            return FALSE;
+
+        count = GetMenuItemCount(hMenu);
+        if (count > 0)
+        {
+            mii.fMask = MIIM_FTYPE;
+            if (GetMenuItemInfoW(hMenu, count - 1, TRUE, &mii) && (mii.fType & MFT_SEPARATOR))
+                return TRUE;
+        }
+
+        return AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+    }
+
+    static BOOL AppendCommandFromMenu(HMENU hTarget, HMENU hSource, UINT uId, BOOL bHasSubMenu = FALSE)
+    {
+        WCHAR szText[256];
+        MENUITEMINFOW mii = { sizeof(mii) };
+
+        if (!GetMenuItemText(hSource, uId, szText, _countof(szText)))
+            return FALSE;
+
+        mii.fMask = MIIM_ID | MIIM_STRING | MIIM_SUBMENU;
+        mii.wID = uId;
+        mii.dwTypeData = szText;
+        mii.hSubMenu = bHasSubMenu ? CreatePopupMenu() : NULL;
+        return InsertMenuItemW(hTarget, GetMenuItemCount(hTarget), TRUE, &mii);
+    }
+
+    static void TrimTrailingSeparator(HMENU hMenu)
+    {
+        MENUITEMINFOW mii = { sizeof(mii) };
+        INT count = GetMenuItemCount(hMenu);
+        if (count <= 0)
+            return;
+
+        mii.fMask = MIIM_FTYPE;
+        if (GetMenuItemInfoW(hMenu, count - 1, TRUE, &mii) && (mii.fType & MFT_SEPARATOR))
+            DeleteMenu(hMenu, count - 1, MF_BYPOSITION);
+    }
+
+    HMENU CreateStartPanelMenu(HMENU hClassicMenu) const
+    {
+        HMENU hSettingsMenu, hMenu;
+        INT cItems;
+
+        hSettingsMenu = GetSubMenuByCommand(hClassicMenu, IDM_SETTINGS);
+        hMenu = CreatePopupMenu();
+        if (!hMenu)
+            return NULL;
+
+        cItems = GetMenuItemCount(hMenu);
+        AddOrSetMenuItem(hMenu, IDM_MYDOCUMENTS, CSIDL_MYDOCUMENTS, FALSE);
+        AddOrSetMenuItem(hMenu, IDM_MYPICTURES, CSIDL_MYPICTURES, FALSE);
+        AddOrSetMenuItem(hMenu, IDM_MYMUSIC, CSIDL_MYMUSIC, FALSE);
+        AddOrSetMenuItem(hMenu, IDM_MYCOMPUTER, CSIDL_DRIVES, FALSE);
+        if (GetMenuItemCount(hMenu) > cItems)
+            AppendSeparatorIfNeeded(hMenu);
+
+        cItems = GetMenuItemCount(hMenu);
+        AppendCommandFromMenu(hMenu, hSettingsMenu, IDM_CONTROLPANEL);
+        AppendCommandFromMenu(hMenu, hSettingsMenu, IDM_NETWORKCONNECTIONS);
+        AppendCommandFromMenu(hMenu, hSettingsMenu, IDM_PRINTERSANDFAXES);
+        AppendCommandFromMenu(hMenu, hSettingsMenu, IDM_TASKBARANDSTARTMENU);
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_SEARCH);
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_HELPANDSUPPORT);
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_RUN);
+        if (GetMenuItemCount(hMenu) > cItems)
+            AppendSeparatorIfNeeded(hMenu);
+
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_SYNCHRONIZE);
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_LOGOFF);
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_DISCONNECT);
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_UNDOCKCOMPUTER);
+        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_SHUTDOWN);
+        TrimTrailingSeparator(hMenu);
+
+        return hMenu;
     }
 
     HRESULT OnGetInfo(LPSMDATA psmd, SMINFO *psminfo)
@@ -119,6 +238,8 @@ private:
         case IDM_SETTINGS: iconIndex = -IDI_SHELL_CONTROL_PANEL1; break;
         case IDM_MYDOCUMENTS: iconIndex = -IDI_SHELL_MY_DOCUMENTS; break;
         case IDM_MYPICTURES: iconIndex = -IDI_SHELL_MY_PICTURES; break;
+        case IDM_MYMUSIC: iconIndex = -IDI_SHELL_MY_MUSIC; break;
+        case IDM_MYCOMPUTER: iconIndex = -IDI_SHELL_MY_COMPUTER; break;
 
         case IDM_CONTROLPANEL: iconIndex = -IDI_SHELL_CONTROL_PANEL; break;
         case IDM_NETWORKCONNECTIONS: iconIndex = -IDI_SHELL_NETWORK_CONNECTIONS2; break;
@@ -356,6 +477,8 @@ private:
             case IDM_DOCUMENTS: return CSIDL_RECENT;
             case IDM_MYDOCUMENTS: return CSIDL_MYDOCUMENTS;
             case IDM_MYPICTURES: return CSIDL_MYPICTURES;
+            case IDM_MYMUSIC: return CSIDL_MYMUSIC;
+            case IDM_MYCOMPUTER: return CSIDL_DRIVES;
             case IDM_CONTROLPANEL: return CSIDL_CONTROLS;
             case IDM_NETWORKCONNECTIONS: return CSIDL_CONNECTIONS;
             case IDM_PRINTERSANDFAXES: return CSIDL_PRINTERS;
@@ -372,11 +495,13 @@ private:
         TRACE("csidl: 0x%X\n", csidl);
 
         CComHeapPtr<ITEMIDLIST> pidl;
-        SHGetSpecialFolderLocation(NULL, csidl, &pidl);
+        HRESULT hr = SHGetSpecialFolderLocation(NULL, csidl, &pidl);
+        if (FAILED_UNEXPECTEDLY(hr))
+            return hr;
 
         CComPtr<IShellFolder> pSF;
         LPCITEMIDLIST pidlChild = NULL;
-        HRESULT hr = SHBindToParent(pidl, IID_IShellFolder, (void**)&pSF, &pidlChild);
+        hr = SHBindToParent(pidl, IID_IShellFolder, (void**)&pSF, &pidlChild);
         if (FAILED(hr))
             return hr;
 
@@ -419,6 +544,19 @@ private:
                 ShellExecuteW(NULL, NULL, szPath, NULL, NULL, SW_SHOWNORMAL);
             else
                 ERR("SHGetSpecialFolderPathW failed\n");
+        }
+        else if (psmd->uId == IDM_MYMUSIC)
+        {
+            if (SHGetSpecialFolderPathW(NULL, szPath, CSIDL_MYMUSIC, FALSE))
+                ShellExecuteW(NULL, NULL, szPath, NULL, NULL, SW_SHOWNORMAL);
+            else
+                ERR("SHGetSpecialFolderPathW failed\n");
+        }
+        else if (psmd->uId == IDM_MYCOMPUTER)
+        {
+            ShellExecuteW(NULL, NULL, L"explorer.exe",
+                          L"::{20D04FE0-3AEA-1069-A2D8-08002B30309D}",
+                          NULL, SW_SHOWNORMAL);
         }
         else
             PostMessageW(m_hwndTray, WM_COMMAND, psmd->uId, 0);
@@ -475,7 +613,8 @@ public:
             m_pTrayPriv->Execute(psmd->psf, psmd->pidlItem);
             break;
         case 0x10000000: // _FilterPIDL from CMenuSFToolbar
-            if (psmd->psf->CompareIDs(0, psmd->pidlItem, m_pidlPrograms) == 0)
+            if (!SHELL_GetSetting(SSF_STARTPANELON, fStartPanelOn) &&
+                psmd->psf->CompareIDs(0, psmd->pidlItem, m_pidlPrograms) == 0)
                 return S_OK;
             return S_FALSE;
         }

@@ -203,6 +203,7 @@ public:
     HRESULT _HasSubMenu();
 
     HRESULT AdjustForTheme(BOOL bFlatStyle);
+    BOOL IsStartPanelLayout() const;
 
     BOOL UseBigIcons()
     {
