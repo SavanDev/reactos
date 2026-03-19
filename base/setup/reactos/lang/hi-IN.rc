@@ -12,7 +12,7 @@ LANGUAGE LANG_HINDI, SUBLANG_HINDI_INDIA
 IDD_STARTPAGE DIALOGEX 0, 0, 317, 193
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "रिऐक्ट ओएस सेटअप"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "रिऐक्ट ओएस सेटअप विज़ार्ड में आपका स्वागत है।", IDC_STARTTITLE, 115, 8, 195, 24
     LTEXT "This wizard will install or upgrade ReactOS on your computer, \
@@ -32,7 +32,7 @@ END
 IDD_TYPEPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "रिऐक्ट ओएस सेटअप"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     AUTORADIOBUTTON "रिऐक्ट ओएस इंस्टॉल करें(&I)", IDC_INSTALL, 7, 20, 277, 10
     LTEXT "रिऐक्ट ओएस की एक नई कापी इन्स्टॉल करें। यह विकल्प आपकी फाइलें, सेटिंग्स और प्रोग्राम नहीं रखता है। आप डिस्क और विभाजन में परिवर्तन कर सकते हैं।", IDC_INSTALLTEXT, 19, 36, 279, 27
@@ -43,7 +43,7 @@ END
 IDD_DEVICEPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "रिऐक्ट ओएस सेटअप"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "कंप्यूटर:", IDC_STATIC, 20, 15, 80, 10
     COMBOBOX IDC_COMPUTER, 100, 15, 180, 80, WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST
@@ -57,7 +57,7 @@ END
 IDD_DRIVEPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "रिऐक्ट ओएस सेटअप"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     CONTROL "", IDC_PARTITION, "SysListView32", WS_BORDER | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL, 7, 7, 303, 112
     PUSHBUTTON "&Initialize", IDC_INITDISK, 7, 122, 50, 14 // NOTE: At same position as IDC_PARTCREATE
@@ -72,7 +72,7 @@ END
 IDD_PARTITION DIALOGEX 0, 0, 200, 120
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "विभाजन बनाएं और फ़ॉर्मेट करें"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "साइज़(&S):", IDC_STATIC, 7, 9, 70, 9
     EDITTEXT IDC_EDIT_PARTSIZE, 82, 7, 47, 13, ES_RIGHT | ES_NUMBER | WS_GROUP
@@ -90,7 +90,7 @@ END
 IDD_FORMAT DIALOGEX 0, 0, 200, 83
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Format Partition"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "फाइल सिस्टम(&F):", IDC_FS_STATIC, 7, 9, 70, 9
     COMBOBOX IDC_FSTYPE, 82, 7, 100, 50, CBS_DROPDOWNLIST | WS_TABSTOP
@@ -102,7 +102,7 @@ END
 IDD_ADVINSTOPTS DIALOGEX 0, 0, 305, 135
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Advanced Installation Options"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Choose the &directory where you want to install ReactOS:", IDC_STATIC, 7, 9, 291, 10
     EDITTEXT IDC_PATH, 7, 23, 291, 13
@@ -116,7 +116,7 @@ END
 IDD_SUMMARYPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "रिऐक्ट ओएस सेटअप"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "इन्स्टलेशन प्रक्रिया शुरू करने के लिए आगे क्लिक करें।", IDC_STATIC, 7, 128, 303, 8
 END
@@ -124,7 +124,7 @@ END
 IDD_PROCESSPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "रिऐक्ट ओएस सेटअप"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "फाइलें इंस्टॉल करें...", IDC_ACTIVITY, 20, 50, 277, 10
     LTEXT "test.txt", IDC_ITEM, 30, 80, 257, 10
@@ -134,7 +134,7 @@ END
 IDD_RESTARTPAGE DIALOGEX 0, 0, 317, 193
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "रिऐक्ट ओएस सेटअप को पूरा करना"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Completing the ReactOS Setup Wizard", IDC_FINISHTITLE, 115, 8, 195, 24
     LTEXT "आपने रिऐक्ट ओएस सेटअप का पहला चरण सफलतापूर्वक पूरा कर लिया है।", IDC_STATIC, 115, 50, 195, 17

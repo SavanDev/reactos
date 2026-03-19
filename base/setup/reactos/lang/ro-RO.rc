@@ -14,7 +14,7 @@ LANGUAGE LANG_ROMANIAN, SUBLANG_NEUTRAL
 IDD_STARTPAGE DIALOGEX 0, 0, 317, 193
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Expert de instalare ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Bun venit la instalarea ReactOS", IDC_STARTTITLE, 115, 8, 195, 24
     LTEXT "Acest expert va instala sau va face upgrade la ReactOS pe computer \
@@ -34,7 +34,7 @@ END
 IDD_TYPEPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Expert de instalare ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     AUTORADIOBUTTON "&Instalează ReactOS", IDC_INSTALL, 7, 20, 277, 10, WS_GROUP | WS_TABSTOP
     LTEXT "Instalarea unei noi copii a ReactOS. Fișierele, configurațiile și programele existente nu vor fi păstrate. Sunt posibile ajustări asupra discurilor și partițiilor.", IDC_INSTALLTEXT, 19, 36, 279, 27, NOT WS_GROUP
@@ -45,7 +45,7 @@ END
 IDD_UPDATEREPAIRPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Expert de instalare ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT       "Expertul de instalare ReactOS poate actualiza una dintre instalările enumerate mai jos, sau, dacă o instalare ReactOS este deteriorată, să încerce să o repare.", IDC_STATIC, 6, 6, 300, 18
     CONTROL     "", IDC_NTOSLIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP, 6, 30, 303, 90
@@ -56,7 +56,7 @@ END
 IDD_DEVICEPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Expert de instalare ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Computer:", IDC_STATIC, 20, 15, 80, 10
     COMBOBOX IDC_COMPUTER, 100, 15, 180, 80, WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST
@@ -70,7 +70,7 @@ END
 IDD_DRIVEPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Expert de instalare ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     CONTROL "", IDC_PARTITION, "SysTreeList32", WS_BORDER | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL, 7, 7, 303, 112
     PUSHBUTTON "&Initializare", IDC_INITDISK, 7, 122, 50, 14 // NOTE: At same position as IDC_PARTCREATE
@@ -85,7 +85,7 @@ END
 IDD_PARTITION DIALOGEX 0, 0, 200, 120
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Crearea și formatarea partiției"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "&Dimensiune:", IDC_STATIC, 7, 9, 70, 9
     EDITTEXT IDC_EDIT_PARTSIZE, 82, 7, 47, 13, ES_RIGHT | ES_NUMBER | WS_GROUP
@@ -103,7 +103,7 @@ END
 IDD_FORMAT DIALOGEX 0, 0, 200, 83
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Formatarea partiției"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "&Sistemul de fișiere:", IDC_FS_STATIC, 7, 9, 70, 9
     COMBOBOX IDC_FSTYPE, 82, 7, 100, 50, CBS_DROPDOWNLIST | WS_TABSTOP
@@ -115,7 +115,7 @@ END
 IDD_ADVINSTOPTS DIALOGEX 0, 0, 305, 135
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Opțiuni de instalare complexă"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Alegeți &directorul unde vreți să instalați ReactOS:", IDC_STATIC, 7, 9, 291, 10
     EDITTEXT IDC_PATH, 7, 23, 291, 13
@@ -129,7 +129,7 @@ END
 IDD_SUMMARYPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Expert de instalare ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Tip de instalare:", IDC_STATIC, 18, 5, 74, 11
     EDITTEXT IDC_INSTALLTYPE, 95, 4, 210, 13, ES_READONLY | ES_AUTOHSCROLL | WS_VISIBLE | NOT WS_BORDER | NOT WS_TABSTOP
@@ -155,7 +155,7 @@ END
 IDD_PROCESSPAGE DIALOGEX 0, 0, 317, 143
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Expert de instalare ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Fișiere în copiere…", IDC_ACTIVITY, 20, 50, 277, 10
     LTEXT "test.txt", IDC_ITEM, 30, 80, 257, 10
@@ -165,7 +165,7 @@ END
 IDD_RESTARTPAGE DIALOGEX 0, 0, 317, 193
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Se finalizează instalarea ReactOS"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Se finalizează expertul de instalare ReactOS", IDC_FINISHTITLE, 115, 8, 195, 24
     LTEXT "Ați finalizat cu succes prima etapă a instalării ReactOS.", IDC_STATIC, 115, 50, 195, 17

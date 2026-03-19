@@ -97,10 +97,24 @@ CreateBoldFont(
     }
     else
     {
-        NONCLIENTMETRICSW ncm;
-        ncm.cbSize = sizeof(ncm);
-        SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, 0, &ncm, 0);
-        lf = ncm.lfMessageFont;
+        HDC hdc = GetDC(NULL);
+
+        lf.lfHeight = -MulDiv(8, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+        lf.lfWidth = 0;
+        lf.lfEscapement = 0;
+        lf.lfOrientation = 0;
+        lf.lfWeight = FW_NORMAL;
+        lf.lfItalic = FALSE;
+        lf.lfUnderline = FALSE;
+        lf.lfStrikeOut = FALSE;
+        lf.lfCharSet = ANSI_CHARSET;
+        lf.lfOutPrecision = OUT_TT_ONLY_PRECIS;
+        lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
+        lf.lfQuality = ANTIALIASED_QUALITY;
+        lf.lfPitchAndFamily = VARIABLE_PITCH | FF_SWISS;
+        StringCchCopyW(lf.lfFaceName, ARRAYSIZE(lf.lfFaceName), L"Tahoma");
+
+        ReleaseDC(NULL, hdc);
     }
 
     /* Make the font bold, keeping the other attributes */
@@ -776,7 +790,9 @@ UpgradeRepairDlgProc(
 
             hList = GetDlgItem(hwndDlg, IDC_NTOSLIST);
 
-            ListView_SetExtendedListViewStyleEx(hList, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);
+            ListView_SetExtendedListViewStyleEx(hList,
+                                               LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER,
+                                               LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
 
             CreateListViewColumns(pSetupData->hInstance,
                                   hList,
