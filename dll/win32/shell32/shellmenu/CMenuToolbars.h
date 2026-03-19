@@ -104,6 +104,7 @@ public:
 
 protected:
     virtual HRESULT OnDeletingButton(const NMTOOLBAR * tb) PURE;
+    virtual BOOL IsStartPanelShellColumn() const { return FALSE; }
 
     virtual HRESULT InternalGetTooltip(INT iItem, INT index, DWORD_PTR dwData, LPWSTR pszText, INT cchTextMax) PURE;
     virtual HRESULT InternalExecuteItem(INT iItem, INT index, DWORD_PTR dwData) PURE;
@@ -120,6 +121,8 @@ protected:
 
 private:
     HRESULT UpdateImageLists();
+    BOOL UseStartPanelColumnColors() const;
+    COLORREF GetStartPanelColumnColor() const;
 
     HRESULT OnPagerCalcSize(LPNMPGCALCSIZE csize);
     HRESULT OnCustomDraw(LPNMTBCUSTOMDRAW cdraw, LRESULT * theResult);
@@ -127,12 +130,14 @@ private:
 
     LRESULT IsTrackedItem(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
     LRESULT ChangeTrackedItem(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+    LRESULT OnEraseBackground(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
     LRESULT OnWinEventWrap(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
     HRESULT OnPopupTimer(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 
     BEGIN_MSG_MAP(CMenuToolbarBase)
         MESSAGE_HANDLER(WM_USER_ISTRACKEDITEM, IsTrackedItem)
         MESSAGE_HANDLER(WM_USER_CHANGETRACKEDITEM, ChangeTrackedItem)
+        MESSAGE_HANDLER(WM_ERASEBKGND, OnEraseBackground)
         MESSAGE_HANDLER(WM_COMMAND, OnWinEventWrap)
         MESSAGE_HANDLER(WM_NOTIFY, OnWinEventWrap)
         MESSAGE_HANDLER(WM_TIMER, OnPopupTimer)
@@ -157,6 +162,7 @@ public:
 
 protected:
     virtual HRESULT OnDeletingButton(const NMTOOLBAR * tb) override;
+    virtual BOOL IsStartPanelShellColumn() const override { return TRUE; }
 
     virtual HRESULT InternalGetTooltip(INT iItem, INT index, DWORD_PTR dwData, LPWSTR pszText, INT cchTextMax) override;
     virtual HRESULT InternalExecuteItem(INT iItem, INT index, DWORD_PTR dwData) override;

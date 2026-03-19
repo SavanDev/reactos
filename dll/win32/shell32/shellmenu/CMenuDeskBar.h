@@ -133,6 +133,9 @@ public:
     STDMETHOD(OnPosRectChangeDB)(LPRECT prc) override;
 
 private:
+    BOOL _IsStartPanelLayout() const;
+    UINT _GetStartPanelHeaderHeight() const;
+
     // message handlers
     LRESULT _OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT _OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
