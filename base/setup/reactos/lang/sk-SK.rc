@@ -8,8 +8,14 @@ LANGUAGE LANG_SLOVAK, SUBLANG_DEFAULT
 /* Dialogs */
 
 IDD_STARTPAGE DIALOGEX 0, 0, 317, 193
+<<<<<<< HEAD
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Inštalácia systému ReactOS" //ReactOS Setup
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     LTEXT "Víta Vás sprievodca inštaláciou systému ReactOS", IDC_STARTTITLE, 115, 8, 195, 24
     LTEXT "This wizard will install or upgrade ReactOS on your computer, \
@@ -27,8 +33,14 @@ if you attempt to run ReactOS on real hardware.", IDC_WARNTEXT3, 120, 130, 190, 
 END
 
 IDD_TYPEPAGE DIALOGEX 0, 0, 317, 143
+<<<<<<< HEAD
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Inštalácia systému ReactOS"
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     AUTORADIOBUTTON "&Nainštalovať systém ReactOS", IDC_INSTALL, 7, 20, 277, 10, WS_GROUP
     AUTORADIOBUTTON "&Opraviť alebo aktualizovať systém ReactOS", IDC_UPDATE, 7, 80, 277, 10
@@ -37,8 +49,14 @@ BEGIN
 END
 
 IDD_UPDATEREPAIRPAGE DIALOGEX 0, 0, 317, 143
+<<<<<<< HEAD
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ReactOS Setup"
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     LTEXT       "The Setup program can upgrade one of the available ReactOS installations listed below, or, if a ReactOS installation is damaged, the Setup program can attempt to repair it.", IDC_STATIC, 6, 6, 303, 18
     CONTROL     "", IDC_NTOSLIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP, 6, 30, 303, 90
@@ -47,8 +65,14 @@ BEGIN
 END
 
 IDD_DEVICEPAGE DIALOGEX 0, 0, 317, 143
+<<<<<<< HEAD
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Inštalácia systému ReactOS"
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     LTEXT "&Počítač:", IDC_STATIC, 20, 15, 80, 10
     COMBOBOX IDC_COMPUTER, 100, 15, 180, 80, WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST
@@ -60,8 +84,14 @@ BEGIN
 END
 
 IDD_DRIVEPAGE DIALOGEX 0, 0, 317, 143
+<<<<<<< HEAD
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Inštalácia systému ReactOS"
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     CONTROL "", IDC_PARTITION, "SysTreeList32", WS_BORDER | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL, 7, 7, 303, 112
     PUSHBUTTON "&Initialize", IDC_INITDISK, 7, 122, 50, 14, WS_GROUP // NOTE: At same position as IDC_PARTCREATE
@@ -76,7 +106,7 @@ END
 IDD_PARTITION DIALOGEX 0, 0, 200, 120
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Vytvoriť a naformátovať partíciu"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "&Veľkosť:", IDC_STATIC, 7, 9, 70, 9
     EDITTEXT IDC_EDIT_PARTSIZE, 82, 7, 47, 13, ES_RIGHT | ES_NUMBER | WS_GROUP
@@ -94,7 +124,7 @@ END
 IDD_FORMAT DIALOGEX 0, 0, 200, 83
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Naformátovať partíciu"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "&Systém súborov:", IDC_FS_STATIC, 7, 9, 70, 9
     COMBOBOX IDC_FSTYPE, 82, 7, 100, 50, CBS_DROPDOWNLIST | WS_TABSTOP
@@ -106,7 +136,7 @@ END
 IDD_ADVINSTOPTS DIALOGEX 0, 0, 305, 135
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Advanced Installation Options"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Tahoma"
 BEGIN
     LTEXT "Choose the &directory where you want to install ReactOS:", IDC_STATIC, 7, 9, 291, 10
     EDITTEXT IDC_PATH, 7, 23, 291, 13
@@ -118,8 +148,14 @@ BEGIN
 END
 
 IDD_SUMMARYPAGE DIALOGEX 0, 0, 317, 143
+<<<<<<< HEAD
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Inštalácia systému ReactOS"
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     LTEXT "Installation type:", IDC_STATIC, 18, 5, 74, 11
     EDITTEXT IDC_INSTALLTYPE, 95, 5, 210, 12, ES_READONLY | ES_AUTOHSCROLL | NOT WS_BORDER | NOT WS_TABSTOP
@@ -143,17 +179,30 @@ BEGIN
 END
 
 IDD_PROCESSPAGE DIALOGEX 0, 0, 317, 143
+<<<<<<< HEAD
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Inštalácia systému ReactOS"
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     LTEXT "Install files...", IDC_ACTIVITY, 20, 35, 277, 10
     LTEXT "test.txt", IDC_ITEM, 20, 83, 277, 10
     CONTROL "", IDC_PROCESSPROGRESS, "msctls_progress32", PBS_SMOOTH | WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 97, 277, 11
 END
 
+<<<<<<< HEAD
 IDD_FINISHPAGE DIALOGEX 0, 0, 317, 193
 STYLE DS_SHELLFONT | WS_CHILD
 FONT 8, "MS Shell Dlg"
+=======
+IDD_RESTARTPAGE DIALOGEX 0, 0, 317, 193
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Inštalácia systému ReactOS"
+FONT 8, "Tahoma"
+>>>>>>> 521ae5a68ec (setup: improve wizard visuals and repaint)
 BEGIN
     LTEXT "Restarting your Computer", IDC_FINISHTITLE, 115, 8, 195, 24
     LTEXT "The first ReactOS installation step has completed successfully.", IDC_STATIC, 115, 40, 195, 24
