@@ -2283,7 +2283,7 @@ static void UpdateItems(TreeListData *pData, unsigned uItem) {
 			pData->uItemPosCount = 0;
 
 			GetClientRect(pData->hWnd, &sRect);
-			InvalidateRect(pData->hWnd, &sRect, TRUE);
+			InvalidateRect(pData->hWnd, &sRect, FALSE);
 
 			memset(pLines, 0, sizeof(unsigned)*uOld);
 			return;
@@ -9448,7 +9448,7 @@ static HWND TreeListEditLabel(TreeListData *pData, unsigned uItem, unsigned uSub
 			break;
 	}
 
-	RedrawWindow(pData->hEdit, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
+	RedrawWindow(pData->hEdit, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
 
 	pData->uLastSel  = MAKELPARAM(uStart, uSize);
 	pData->uEditItem = uItem;
@@ -10345,7 +10345,7 @@ static LRESULT CALLBACK TreeListProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 			UNLOCK(pData);
 
 			if(uFlag) {
-				RedrawWindow(pData->hHeader, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
+				RedrawWindow(pData->hHeader, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
 			}
 
 			return 0;
