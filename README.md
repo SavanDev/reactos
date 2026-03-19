@@ -31,6 +31,14 @@
 [ReactOS Git mirror](https://git.reactos.org/) &bull;
 [Testman](https://reactos.org/testman/)
 
+## About This Fork
+
+This repository is a fork of the original [ReactOS](https://github.com/reactos/reactos) project, not the official upstream repository.
+
+The objective of this fork is to push ReactOS `0.5.0-dev` toward a more stable and testable system for day-to-day development, with priority placed on visible behavior and regression reduction in setup, boot, logon, shell, explorer, desktop, repaint, input, storage and shutdown paths.
+
+It follows the broader ReactOS goal of NT-compatible free software, but uses a narrower maintenance strategy centered on stabilization, diagnosability and predictable validation for this fork's release track.
+
 ## What is ReactOS?
 
 ReactOS™ is an Open Source effort to develop a quality operating system that is compatible with applications and drivers written for the Microsoft® Windows™ NT family of operating systems.
