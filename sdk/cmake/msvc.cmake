@@ -419,8 +419,16 @@ function(spec2def _dllname _spec_file)
 
     if(__spec2def_VERSION)
         set(__version_arg "--version=0x${__spec2def_VERSION}")
+        set(__effective_export_version "0x${__spec2def_VERSION}")
     else()
         set(__version_arg "--version=${DLL_EXPORT_VERSION}")
+        set(__effective_export_version "${DLL_EXPORT_VERSION}")
+    endif()
+
+    if(NT5_STRICT AND __effective_export_version GREATER 0x502)
+        message(FATAL_ERROR
+            "NT5_STRICT forbids exports above 0x502. "
+            "Target ${_dllname} requests ${__effective_export_version} from ${_spec_file}.")
     endif()
 
     if(__spec2def_WITH_DBG OR (DBG AND NOT __spec2def_NO_DBG))
