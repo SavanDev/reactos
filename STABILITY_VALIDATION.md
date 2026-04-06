@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the minimum stability checks expected for changes and release candidates while ReactOS is focused on hardening NT 5.x compatibility.
+This document defines the minimum stability checks expected for this fork's personal validation loop while it is focused on hardening NT 5.x compatibility.
 
 The goal is to catch regressions in visible behavior before prioritizing new functionality.
 
@@ -52,7 +52,7 @@ Changes that improve synthetic tests while regressing the reference suite should
 
 ## Change-level expectations
 
-Pull requests that touch user-visible or session-critical code should describe:
+Changes that touch user-visible or session-critical code should describe:
 
 - which visible NT 5.x behavior is affected
 - what manual or automated validation was performed
