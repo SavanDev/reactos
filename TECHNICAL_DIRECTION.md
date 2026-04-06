@@ -1,9 +1,12 @@
 # Technical Direction
 
+This document describes the personal technical direction of this fork.
+It is not a statement of governance or roadmap for upstream ReactOS.
+
 ## Product target
 
-ReactOS is currently focused on becoming a stable NT 5.x-compatible operating system.
-The practical compatibility ceiling is the Windows 2000, XP and Server 2003 line.
+This fork is currently focused on shaping a more stable NT 5.x-compatible system around the maintainer's preferred `0.5.x` baseline.
+The practical compatibility ceiling remains the Windows 2000, XP and Server 2003 line.
 
 This means the project should optimize first for:
 
@@ -12,7 +15,7 @@ This means the project should optimize first for:
 - reliable execution of target applications
 - maintainable and diagnosable system internals
 
-The project is not currently targeting Vista-or-later compatibility as a primary engineering goal.
+This fork is not currently targeting Vista-or-later compatibility as a primary engineering goal.
 
 ## External contract
 
@@ -51,7 +54,7 @@ Acceptable areas include:
 - internal mechanisms in kernel or services that are not exposed as a new public contract
 - optional utilities that do not replace the default Windows-compatible workflow
 
-Not acceptable without an explicit project-level decision:
+Not acceptable without an explicit fork-level decision:
 
 - changing default Win32, shell, registry, service manager or path semantics to resemble Unix
 - introducing new public APIs that move the system outside the NT 5.x contract
@@ -75,3 +78,5 @@ Subsystems that should be treated as high-risk and user-visible:
 - `ntoskrnl` and base drivers involved in stability-critical paths
 
 Compatibility with third-party Windows drivers is a secondary goal. Existing working scenarios should be preserved when reasonable, but core architecture should not be optimized around maximum historical driver coverage.
+
+When a tradeoff is unclear, prefer the option that best supports this fork's practical day-to-day use, testing rhythm and visible stability.

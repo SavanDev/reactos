@@ -1,38 +1,28 @@
-# Rules for managing Pull Requests
+# Pull Request Note
 
-For the sake of trying to maintain an acceptable number of open but idle PRs, the following rules should be considered:
-- If a PR has at least one approval, it can be merged after 1 week of waiting for additional comments.
-  - If the change has at least 3 approvals or you consider it trivial enough, it may be merged right away.
-- If a PR stays in "changes requested" for too long, and there is no indication from the author that they are working on it, it shall be closed.
-  - Rule of thumb: 2 weeks for a small PR. Can be longer if the PR is large.
-  - The PR can be reopened at any point, if you have additional comments, or new changes have been done.
-- If you require a review from a particular person, assign the PR to that person. Don't just rely on the "review requested" feature of GitHub.
-- Remember that PR labels exist. You can assign an appropriate label to a pull request to designate it's scope, grab additional attention or just for extra navigation possibilities.
-- Don't feel obliged to comment everything you see, just for the sake of commenting. Be it on JIRA, GitHub, or even on IRC.
+This fork does not use a formal pull request management process.
+There is no promised review queue, approval threshold, merge cadence or label taxonomy here.
 
-In addition, in order to avoid coming off as rude to helpful contributors, please refrain from:
-- Asking the contributor to do unrelated work
-- Closing without providing a reason
-- Merging with the intention to rewrite that code soon after
+If a pull request exists, treat it as an optional input channel rather than as the center of the workflow.
 
-Project review priority is stability of the visible NT 5.x-compatible system. Regressions in boot, logon, explorer, desktop, start menu, tray, input, storage, networking, setup and shutdown should be treated as release-relevant even when the affected patch is otherwise small.
+## What Matters If A PR Is Considered
 
-Before merging a PR, make sure it follows the [contributing rules](CONTRIBUTING.md#rules-and-recommendations), but more importantly:
-- Make sure the author has specified a real e-mail in all PR commits
-- If PR contains code or translations, make sure the author has not specified a nickname or alias, but a full legal name in all PR commits
-- If PR contains media (wallpapers, themes, icons, sounds) or out-of-code documentation, make sure the author has specified the name or alias in all PR commits
-- If PR contains mixed code with media changes, handle it as PR with code
-- Verify that the PR does not weaken the documented NT 5.x-visible contract in favor of a more "pure" internal design
-- Prefer pragmatic designs that reduce crashes, races, repaint issues or recovery failures without changing external behavior
-- Ask for explicit validation when a PR touches explorer, shellmenu, comctl32, win32k, setup, services, session startup or shutdown paths
-- Block merges that introduce or leave unresolved visible regressions in common user flows simply because the code looks architecturally cleaner
-- Important notes before using "Squash and merge" strategy on a PR:
-  - Make sure the author's name in GitHub profile matches one in commits. If this is not the case, ask the author to set it accordingly.
-  - If the author does not want to set the name in GitHub profile:
-    - "no squash merge" label needs to be added to a PR.
-	- Make sure every commit message is formatted correctly as in [.gitmessage](https://github.com/reactos/reactos/blob/master/.gitmessage).
-	- Finally in this case a PR has to be merged either using "Rebase and merge" strategy or manually.
-  - By pressing "Squash and merge" button in a PR you can make sure the author does not use no-reply e-mail -
-  under the commit message there will be a text label saying: `This commit will be authored by <address@email.com>`
+- the change fits the current personal direction of the fork
+- the patch is small enough to review quickly
+- visible NT 5.x behavior is preserved or improved
+- the change reduces instability, not just internal discomfort
+- the author explains what was tested
 
-For direction and validation policy, see [Technical Direction](TECHNICAL_DIRECTION.md) and [Stability Validation](STABILITY_VALIDATION.md).
+## What Usually Does Not Fit
+
+- broad rewrites done mainly for architectural purity
+- process-heavy PRs that assume a large maintainer team
+- compatibility expansion that pulls the fork away from its current `0.5.x` baseline
+- patches that leave visible regressions behind because the internals look cleaner
+
+## Practical Expectation
+
+A PR may be merged, ignored, postponed or superseded by local work depending on the fork owner's current priorities.
+That is normal for this repository.
+
+For direction and validation policy, see [TECHNICAL_DIRECTION.md](TECHNICAL_DIRECTION.md) and [STABILITY_VALIDATION.md](STABILITY_VALIDATION.md).

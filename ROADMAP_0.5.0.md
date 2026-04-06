@@ -1,8 +1,10 @@
-# ReactOS 0.5.0 Roadmap
+# ReactOS 0.5.x Personal Roadmap
 
 ## Objective
 
-ReactOS 0.5.0 is the first release line explicitly optimized for a stable NT 5.x-compatible system.
+The `0.5.x` line in this fork is a personal stabilization track, not a public promise of upstream release management.
+
+It is the current baseline used to shape the system toward the maintainer's preferred behavior while studying and retouching ReactOS.
 
 The target user experience is:
 
@@ -12,9 +14,9 @@ The target user experience is:
 - install and run a small fixed set of NT 5.x target applications
 - shut down and reboot cleanly
 
-## Release rules
+## Direction rules
 
-0.5.0 should be judged by visible system quality, not by architectural ambition.
+This line should be judged by visible system quality, not by architectural ambition.
 
 Changes are in scope when they:
 
@@ -79,9 +81,9 @@ Changes are out of scope when they:
 - internal refactors with no near-term stability payoff
 - optional Unix-like tooling that does not help current stabilization work
 
-## Exit criteria for 0.5.0
+## Exit criteria for this line
 
-0.5.0 is ready only when all of the following are true on the reference build:
+This line is in a good state only when all of the following are true on the reference build:
 
 - no common crash/hang path remains in boot, logon, explorer or shutdown
 - start menu, tray and desktop are usable without obvious visual corruption in normal use
@@ -91,7 +93,7 @@ Changes are out of scope when they:
 
 ## Initial target application suite
 
-This list should stay small and fixed for the whole 0.5.0 cycle.
+This list should stay small and fixed for the current `0.5.x` cycle in this fork.
 
 - 7-Zip
 - Notepad++
