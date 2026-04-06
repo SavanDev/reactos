@@ -7,21 +7,15 @@
 ---
 
 <p align=center>
-  <a href="https://reactos.org/download/">
-    <img alt="ReactOS 0.5.0-dev" src="https://img.shields.io/badge/development-0.5.0--dev-0688CB.svg"></a>
-  <a href="https://reactos.org/download/">
-    <img alt="Download ReactOS" src="https://img.shields.io/badge/download-latest-0688CB.svg"></a>
-  <a href="https://sourceforge.net/projects/reactos/">
-    <img alt="SourceForge Download" src="https://img.shields.io/sourceforge/dm/reactos.svg?colorB=0688CB"></a>
+  <img alt="Fork focus" src="https://img.shields.io/badge/fork-personal%200.5.x-4B5563.svg">
   <a href="https://github.com/reactos/reactos/blob/master/COPYING">
     <img alt="License" src="https://img.shields.io/badge/license-GNU_GPL_2.0-0688CB.svg"></a>
-  <a href="https://reactos.org/donate/">
-    <img alt="Donate" src="https://img.shields.io/badge/%24-donate-E44E4A.svg"></a>
-  <a href="https://twitter.com/reactos">
-    <img alt="Follow on Twitter" src="https://img.shields.io/twitter/follow/reactos.svg?style=social&label=Follow%20%40reactos"></a>
 </p>
 
-## Quick Links
+## Official ReactOS Links
+
+These links point to the upstream ReactOS project, not to this fork.
+
 [Website](https://reactos.org/) &bull;
 [Official chat](https://chat.reactos.org/) &bull;
 [Wiki](https://reactos.org/wiki/) &bull;
@@ -35,9 +29,11 @@
 
 This repository is a fork of the original [ReactOS](https://github.com/reactos/reactos) project, not the official upstream repository.
 
-The objective of this fork is to push ReactOS `0.5.0-dev` toward a more stable and testable system for day-to-day development, with priority placed on visible behavior and regression reduction in setup, boot, logon, shell, explorer, desktop, repaint, input, storage and shutdown paths.
+This fork is primarily a personal workspace for experimenting, doing some vibe coding, studying the ReactOS codebase, and retouching the system to better match the maintainer's own preferences.
 
-It follows the broader ReactOS goal of NT-compatible free software, but uses a narrower maintenance strategy centered on stabilization, diagnosability and predictable validation for this fork's release track.
+The current `0.5.x` line in this repository is a personal product direction: a practical baseline for how this fork should behave while it is being stabilized and reshaped. The priority is visible behavior, regression reduction, and a system that feels better to use while remaining grounded in NT 5.x expectations.
+
+This documentation intentionally reflects that reality. It does not frame the fork as a community-managed effort with formal governance or shared ownership.
 
 ## What is ReactOS?
 
@@ -55,7 +51,8 @@ The code of ReactOS is licensed under [GNU GPL 2.0](https://github.com/reactos/r
 
 ## Building
 
-![Build](https://github.com/reactos/reactos/workflows/Build/badge.svg) [![rosbewin.badge]][rosbewin.link] [![rosbeunix.badge]][rosbeunix.link] [![coverity.badge]][coverity.link]
+This section keeps the general ReactOS build references.
+Local scripts, directories or personal testing habits in this fork may differ from upstream conventions.
 
 To build the system it is strongly advised to use the _ReactOS Build Environment (RosBE)._
 Up-to-date versions for Windows and for Unix/GNU-Linux are available from our download page at: ["Build Environment"](https://reactos.org/wiki/Build_Environment).
@@ -71,8 +68,6 @@ To build ReactOS you must run the `configure` script in the directory you want t
 ### Bootable images
 
 To build a bootable CD image run `ninja bootcd` from the build directory. This will create a CD image with a filename `bootcd.iso`.
-
-You can always download fresh binary builds of bootable images from the ["Daily builds"](https://reactos.org/getbuilds/) page.
 
 ## Installing
 
@@ -90,29 +85,25 @@ See ["Installing ReactOS"](https://reactos.org/wiki/Installing_ReactOS) Wiki pag
 
 ReactOS development prioritizes visible system stability over feature expansion. Regressions in boot, logon, explorer, desktop, start menu, tray, input, networking, storage or shutdown behavior take priority over new features.
 
-See [Technical Direction](TECHNICAL_DIRECTION.md), [Stability Validation](STABILITY_VALIDATION.md), [ReactOS 0.5.0 Roadmap](ROADMAP_0.5.0.md) and [Solo + AI Workflow](SOLO_AI_WORKFLOW.md) for the current engineering policy, release validation expectations and maintenance workflow for this fork.
+See [Technical Direction](TECHNICAL_DIRECTION.md), [Stability Validation](STABILITY_VALIDATION.md), [0.5.x Personal Roadmap](ROADMAP_0.5.0.md) and [Personal Workflow](PERSONAL_WORKFLOW.md) for the current engineering policy, personal release direction and maintenance workflow for this fork.
 
-If you discover a bug in ReactOS search on JIRA first - it might be reported already. If not report the bug providing logs and as much information as possible.
+If you are checking whether an issue already exists in upstream ReactOS, search JIRA first. If not, report the bug providing logs and as much information as possible.
 
 See ["File Bugs"](https://reactos.org/wiki/File_Bugs) for a guide.
 
-__NOTE:__ The bug tracker is _not_ for discussions. Please use our [official chat](https://chat.reactos.org/) or our [forum](https://reactos.org/forum/).
+__NOTE:__ The upstream bug tracker is _not_ for discussions. Use the upstream [official chat](https://chat.reactos.org/) or [forum](https://reactos.org/forum/) for that.
 
-## Contributing  [![prwelcome.badge]](https://reactos.org/wiki/Commiting_Changes)
+## Contributing
 
-We are always looking for developers! Check [how to contribute](CONTRIBUTING.md) if you are willing to participate.
+This fork is not run like an open team project. The default assumption is that it is maintained for personal experimentation and day-to-day work, not for an ongoing public contribution process.
 
-Contributors working on new code paths should read [Technical Direction](TECHNICAL_DIRECTION.md) first. Changes that preserve or improve NT 5.x-visible behavior, system stability and diagnosability are preferred over changes that only make internals look closer to a specific historical NT implementation.
+If you want to understand the direction of this fork or prepare a patch anyway, read [CONTRIBUTING.md](CONTRIBUTING.md) first. Small, focused changes that improve NT 5.x-visible behavior, stability and diagnosability fit this fork better than broad rewrites or architecture work done for its own sake.
 
 __Legal notice__: If you have seen proprietary Microsoft Windows source code (including but not limited to the leaked Windows NT 3.5, NT 4, 2000 source code and the Windows Research Kernel), your contribution won't be accepted because of potential copyright violation.
 
-Try out cloud-based ReactOS development using Gitpod and Docker:
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/reactos/reactos)
-
-You can also support ReactOS by [donating](https://reactos.org/donate/)! We rely on our backers to maintain our servers and accelerate development by [hiring full-time devs](https://reactos.org/contributing/#paid-jobs).
-
 ## More information
+
+This section summarizes ReactOS itself as a project, not the specific workflow of this fork.
 
 ReactOS is a Free and Open Source operating system based on the Windows architecture,
 providing support for existing applications and drivers, and an alternative to the current dominant consumer operating system.
@@ -129,20 +120,13 @@ Also see the [media/doc](/media/doc/) subdirectory for some sparse notes.
 
 ## Who is responsible
 
-Active devs are listed as members of [GitHub organization](https://github.com/orgs/reactos/people).
-See also the [CREDITS](CREDITS) file for others.
+This fork is maintained as a personal project by its owner.
 
-## Code mirrors
+For upstream ReactOS development, see the [GitHub organization](https://github.com/orgs/reactos/people) and the [CREDITS](CREDITS) file.
+
+## Upstream code mirrors
 
 The main development is done on [GitHub](https://github.com/reactos/reactos). We have an [alternative mirror](https://git.reactos.org/?p=reactos.git) in case GitHub is down.
 
 There is also an obsolete [SVN archive repository](https://svn.reactos.org/reactos/) that is kept for historical purposes.
 
-[coverity.badge]:   https://scan.coverity.com/projects/205/badge.svg?flat=1
-[rosbewin.badge]:   https://img.shields.io/badge/RosBE_Windows-2.2.1-0688CB.svg
-[rosbeunix.badge]:  https://img.shields.io/badge/RosBE_Unix-2.2.1-0688CB.svg
-[prwelcome.badge]:  https://img.shields.io/badge/PR-welcome-0688CB.svg
-
-[coverity.link]:    https://scan.coverity.com/projects/205
-[rosbewin.link]:    https://sourceforge.net/projects/reactos/files/RosBE-Windows/i386/2.2.1/
-[rosbeunix.link]:   https://sourceforge.net/projects/reactos/files/RosBE-Unix/2.2.1/

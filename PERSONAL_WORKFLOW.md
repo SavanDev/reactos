@@ -1,9 +1,9 @@
-# Solo + AI Workflow
+# Personal Workflow
 
 ## Purpose
 
-This fork is maintained by one human and Codex.
-The workflow must therefore optimize for short, reproducible stabilization loops instead of large parallel efforts.
+This fork is maintained as a personal project.
+The workflow is meant to keep experimentation, study and stabilization moving without pretending this is a multi-maintainer process.
 
 ## Default work loop
 
@@ -25,7 +25,7 @@ Always pick the highest user-visible regression from the highest-priority subsys
 
 In practice, prefer:
 
-- shell/session breakage
+- shell and session breakage
 - repaint, focus and input bugs
 - boot, logon, setup and shutdown failures
 - storage and networking regressions
@@ -60,7 +60,7 @@ Every meaningful change should leave behind:
 - the result observed
 - the next most likely subsystem if the fix was insufficient
 
-Use [STABILITY_VALIDATION.md](STABILITY_VALIDATION.md) as the baseline for deciding whether a fix is "good enough".
+Use [STABILITY_VALIDATION.md](STABILITY_VALIDATION.md) as the baseline for deciding whether a fix is good enough.
 
 ## Suggested session structure
 
@@ -71,23 +71,12 @@ For a typical work session:
 3. Rebuild the affected target or image
 4. Test the visible result
 5. Decide whether the issue is fixed, reduced or merely displaced
-6. Commit notes or update the roadmap/backlog if priority changed
+6. Update notes or roadmap only if priorities actually changed
 
-## When to use AI aggressively
+## Tooling rule
 
-Codex is most useful for:
-
-- tracing ownership across subsystems
-- finding repeated bad patterns
-- preparing minimal patches
-- regenerating builds and artifacts
-- documenting findings and stabilizing process
-
-Codex is less useful when:
-
-- the only missing information is visual runtime behavior that must be observed directly
-- the change requires product intent rather than technical deduction
-- the bug needs hardware behavior that is not reproducible in the current environment
+Tools, scripts and assistants should reduce friction, not create fake process.
+Use them to shorten the loop, not to invent coordination overhead that this fork does not need.
 
 ## Decision discipline
 
@@ -97,5 +86,6 @@ If a task does not clearly improve:
 - stability
 - diagnosability
 - maintenance cost in a critical subsystem
+- the current personal direction of the fork
 
 it should usually wait.
