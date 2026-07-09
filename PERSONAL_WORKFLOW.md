@@ -2,8 +2,7 @@
 
 ## Purpose
 
-This fork is maintained as a personal project.
-The workflow is meant to keep experimentation, study and stabilization moving without pretending this is a multi-maintainer process.
+See [About This Fork](README.md#about-this-fork) for what "personal" means here. This workflow is meant to keep experimentation, study and stabilization moving without pretending this is a multi-maintainer process.
 
 ## Default work loop
 
@@ -21,20 +20,7 @@ Do not carry multiple speculative fixes in one step unless the first fix proved 
 
 ## Priority rule
 
-Always pick the highest user-visible regression from the highest-priority subsystem in [ROADMAP_0.5.0.md](ROADMAP_0.5.0.md).
-
-In practice, prefer:
-
-- shell and session breakage
-- repaint, focus and input bugs
-- boot, logon, setup and shutdown failures
-- storage and networking regressions
-
-before:
-
-- broad refactors
-- new features
-- speculative compatibility work
+Always pick the highest user-visible regression from the highest-priority subsystem, per the order in [Technical Direction](TECHNICAL_DIRECTION.md#engineering-priorities), among the items tracked in [ROADMAP_0.5.0.md](ROADMAP_0.5.0.md).
 
 ## Patch rule
 

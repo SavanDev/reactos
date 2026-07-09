@@ -1,7 +1,6 @@
 # Technical Direction
 
-This document describes the personal technical direction of this fork.
-It is not a statement of governance or roadmap for upstream ReactOS.
+This document describes the technical direction of this fork. See [About This Fork](README.md#about-this-fork) for what "personal" means here — this is not a statement of governance or roadmap for upstream ReactOS.
 
 ## Product target
 
