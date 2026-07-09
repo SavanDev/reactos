@@ -52,6 +52,11 @@ private:
     DWORD m_ShowFlags;
 
     BOOL m_didAddRef;
+    STARTPANELLAYOUTRECTS m_StartPanelRects;
+    INT m_StartPanelHotButton;
+    BOOL m_StartPanelTrackingMouse;
+    WCHAR m_szLogOff[128];
+    WCHAR m_szShutdown[128];
 
     virtual void OnFinalMessage(HWND hWnd);
 public:
@@ -75,6 +80,9 @@ public:
         MESSAGE_HANDLER(WM_WININICHANGE , _OnWinIniChange)
         MESSAGE_HANDLER(WM_NCPAINT, _OnNcPaint)
         MESSAGE_HANDLER(WM_CLOSE, _OnClose)
+        MESSAGE_HANDLER(WM_MOUSEMOVE, _OnMouseMove)
+        MESSAGE_HANDLER(WM_MOUSELEAVE, _OnMouseLeave)
+        MESSAGE_HANDLER(WM_LBUTTONUP, _OnLButtonUp)
     END_MSG_MAP()
 
     BEGIN_COM_MAP(CMenuDeskBar)
@@ -135,6 +143,13 @@ public:
 private:
     BOOL _IsStartPanelLayout() const;
     UINT _GetStartPanelHeaderHeight() const;
+    UINT _GetStartPanelFooterHeight() const;
+    VOID _GetStartPanelRects(STARTPANELLAYOUTRECTS *pRects) const;
+    HRESULT _LoadStartPanelFooterStrings();
+    VOID _InvalidateStartPanelFooter();
+    INT _StartPanelHitTestFooterButton(POINT pt) const;
+    VOID _SetStartPanelHotButton(INT iButton);
+    HRESULT _ExecuteStartPanelFooterCommand(UINT uId);
 
     // message handlers
     LRESULT _OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
@@ -147,6 +162,9 @@ private:
     LRESULT _OnWinIniChange(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT _OnNcPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
     LRESULT _OnClose(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
+    LRESULT _OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
+    LRESULT _OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
+    LRESULT _OnLButtonUp(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
 
     HRESULT _AdjustForTheme(BOOL bFlatStyle);
     BOOL _IsSubMenuParent(HWND hwnd);

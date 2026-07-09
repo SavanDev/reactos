@@ -30,24 +30,31 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(CMenuToolbars);
 
-#define STARTPANEL_SHELL_BG  RGB(255, 255, 255)
-#define STARTPANEL_STATIC_BG RGB(232, 228, 218)
-#define STARTPANEL_HOT_BG    RGB(49, 106, 197)
-#define STARTPANEL_PINNED_LIMIT 2
-#define STARTPANEL_RECENT_LIMIT 4
+#define STARTPANEL_PINNED_LIMIT 6
+#define STARTPANEL_RECENT_LIMIT 6
 #define STARTPANEL_MAX_REG_BUF (MAX_PATH * 8)
 #define STARTPANEL_CMD_BASE    0x6000
+#define IDM_STARTPANEL_PIN     0x7100
+#define IDM_STARTPANEL_UNPIN   0x7101
+#define IDM_STARTPANEL_REMOVE  0x7102
 
 static const WCHAR s_szStartPanelKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartPanel";
-static const WCHAR s_szPinnedPrograms[] = L"PinnedPrograms";
 static const WCHAR s_szRecentPrograms[] = L"RecentPrograms";
+static const WCHAR s_szPinnedPrograms[] = L"PinnedPrograms";
+static const WCHAR s_szPinnedMigrated[] = L"PinnedMigrated";
 
 struct STARTPANEL_ITEMDATA
 {
     BOOL bCustomPath;
+    BOOL bStartPanelPinned;
+    BOOL bStartPanelRecent;
     LPITEMIDLIST pidl;
     WCHAR szPath[MAX_PATH];
+    WCHAR szRecentPath[MAX_PATH];
 };
+
+static INT GetPathIconIndex(LPCWSTR pszPath);
+static void GetPathDisplayName(LPCWSTR pszPath, LPWSTR pszText, UINT cchText);
 
 static STARTPANEL_ITEMDATA* CreatePidlItemData(LPITEMIDLIST pidl)
 {
@@ -59,20 +66,27 @@ static STARTPANEL_ITEMDATA* CreatePidlItemData(LPITEMIDLIST pidl)
     }
 
     pData->bCustomPath = FALSE;
+    pData->bStartPanelPinned = FALSE;
+    pData->bStartPanelRecent = FALSE;
     pData->pidl = pidl;
     pData->szPath[0] = UNICODE_NULL;
+    pData->szRecentPath[0] = UNICODE_NULL;
     return pData;
 }
 
-static STARTPANEL_ITEMDATA* CreateCustomPathItemData(LPCWSTR pszPath)
+static STARTPANEL_ITEMDATA* CreateCustomPathItemData(LPCWSTR pszPath, LPCWSTR pszRecentPath = NULL,
+                                                     BOOL bPinned = FALSE, BOOL bRecent = FALSE)
 {
     STARTPANEL_ITEMDATA* pData = new STARTPANEL_ITEMDATA;
     if (!pData)
         return NULL;
 
     pData->bCustomPath = TRUE;
+    pData->bStartPanelPinned = bPinned;
+    pData->bStartPanelRecent = bRecent;
     pData->pidl = NULL;
     StringCchCopyW(pData->szPath, _countof(pData->szPath), pszPath);
+    StringCchCopyW(pData->szRecentPath, _countof(pData->szRecentPath), pszRecentPath ? pszRecentPath : pszPath);
     return pData;
 }
 
@@ -159,30 +173,403 @@ static BOOL PathInProgramList(WCHAR Entries[][MAX_PATH], UINT Count, LPCWSTR psz
     return FALSE;
 }
 
-static UINT SeedDefaultPinnedPrograms(WCHAR Entries[][MAX_PATH], UINT cEntries)
+static BOOL IsStartPanelPinnablePath(LPCWSTR pszPath)
 {
-    static const LPCWSTR s_DefaultExecutables[] =
+    if (!pszPath || !*pszPath || !PathFileExistsW(pszPath) || PathIsDirectoryW(pszPath))
+        return FALSE;
+
+    return PathMatchSpecW(pszPath, L"*.lnk") ||
+           PathMatchSpecW(pszPath, L"*.exe") ||
+           PathMatchSpecW(pszPath, L"*.com") ||
+           PathMatchSpecW(pszPath, L"*.bat") ||
+           PathMatchSpecW(pszPath, L"*.cmd");
+}
+
+static BOOL NormalizeStartPanelRecentPath(LPCWSTR pszPath, LPWSTR pszRecentPath, UINT cchRecentPath)
+{
+    CComPtr<IShellLinkW> psl;
+    CComPtr<IPersistFile> ppf;
+    WIN32_FIND_DATAW wfd = { 0 };
+
+    if (!pszPath || !*pszPath || !pszRecentPath || cchRecentPath == 0)
+        return FALSE;
+
+    if (PathMatchSpecW(pszPath, L"*.lnk") &&
+        SUCCEEDED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARG(IShellLinkW, &psl))) &&
+        SUCCEEDED(psl->QueryInterface(IID_PPV_ARG(IPersistFile, &ppf))) &&
+        SUCCEEDED(ppf->Load(pszPath, STGM_READ)) &&
+        SUCCEEDED(psl->GetPath(pszRecentPath, cchRecentPath, &wfd, SLGP_RAWPATH)) &&
+        pszRecentPath[0])
     {
-        L"iexplore.exe",
-        L"notepad.exe",
-        L"mspaint.exe",
-        L"explorer.exe",
-        L"cmd.exe",
+        return TRUE;
+    }
+
+    return SUCCEEDED(StringCchCopyW(pszRecentPath, cchRecentPath, pszPath));
+}
+
+static BOOL GetStartPanelIdentityPath(LPCWSTR pszPath, LPWSTR pszIdentityPath, UINT cchIdentityPath)
+{
+    return NormalizeStartPanelRecentPath(pszPath, pszIdentityPath, cchIdentityPath);
+}
+
+static BOOL GetStartPanelPinnedFolder(LPWSTR pszPath, UINT cchPath)
+{
+    UNREFERENCED_PARAMETER(cchPath);
+
+    if (FAILED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, pszPath)))
+        return FALSE;
+
+    return PathAppendW(pszPath, L"ReactOS\\Start Menu\\Pinned");
+}
+
+static BOOL ResolveStartPanelDefaultTarget(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath)
+{
+    WCHAR szBase[MAX_PATH];
+
+    if (!pszFileName || !*pszFileName || !pszPath || cchPath == 0)
+        return FALSE;
+
+    if (lstrcmpiW(pszFileName, L"iexplore.exe") == 0)
+    {
+        if (FAILED(SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILES, NULL, SHGFP_TYPE_CURRENT, szBase)))
+            return FALSE;
+
+        if (!PathAppendW(szBase, L"Internet Explorer"))
+            return FALSE;
+        if (!PathAppendW(szBase, pszFileName))
+            return FALSE;
+
+        if (PathFileExistsW(szBase))
+            return SUCCEEDED(StringCchCopyW(pszPath, cchPath, szBase));
+    }
+    else if (lstrcmpiW(pszFileName, L"explorer.exe") == 0)
+    {
+        if (GetWindowsDirectoryW(szBase, _countof(szBase)) == 0)
+            return FALSE;
+
+        if (!PathAppendW(szBase, pszFileName))
+            return FALSE;
+
+        if (PathFileExistsW(szBase))
+            return SUCCEEDED(StringCchCopyW(pszPath, cchPath, szBase));
+    }
+    else
+    {
+        if (GetSystemDirectoryW(szBase, _countof(szBase)) == 0)
+            return FALSE;
+
+        if (!PathAppendW(szBase, pszFileName))
+            return FALSE;
+
+        if (PathFileExistsW(szBase))
+            return SUCCEEDED(StringCchCopyW(pszPath, cchPath, szBase));
+    }
+
+    return SearchPathW(NULL, pszFileName, NULL, cchPath, pszPath, NULL) != 0;
+}
+
+static BOOL ResolveStartPanelProgramsShortcut(LPCWSTR pszSubPath, LPWSTR pszPath, UINT cchPath)
+{
+    if (FAILED(SHGetFolderPathW(NULL, CSIDL_PROGRAMS, NULL, SHGFP_TYPE_CURRENT, pszPath)))
+        return FALSE;
+
+    if (!PathAppendW(pszPath, pszSubPath))
+        return FALSE;
+
+    return PathFileExistsW(pszPath);
+}
+
+static BOOL EnsureStartPanelPinnedFolder(LPWSTR pszPath, UINT cchPath)
+{
+    int Error;
+
+    if (!GetStartPanelPinnedFolder(pszPath, cchPath))
+        return FALSE;
+
+    Error = SHCreateDirectoryExW(NULL, pszPath, NULL);
+    return Error == ERROR_SUCCESS || Error == ERROR_ALREADY_EXISTS || Error == ERROR_FILE_EXISTS;
+}
+
+static BOOL CreateStartPanelShortcut(LPCWSTR pszShortcutPath, LPCWSTR pszTargetPath)
+{
+    CComPtr<IShellLinkW> psl;
+    CComPtr<IPersistFile> ppf;
+    WCHAR szWorkingDir[MAX_PATH];
+
+    if (!pszShortcutPath || !pszTargetPath || !*pszShortcutPath || !*pszTargetPath)
+        return FALSE;
+
+    if (FAILED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARG(IShellLinkW, &psl))) ||
+        FAILED(psl->QueryInterface(IID_PPV_ARG(IPersistFile, &ppf))))
+    {
+        return FALSE;
+    }
+
+    StringCchCopyW(szWorkingDir, _countof(szWorkingDir), pszTargetPath);
+    PathRemoveFileSpecW(szWorkingDir);
+
+    if (FAILED(psl->SetPath(pszTargetPath)) ||
+        FAILED(psl->SetWorkingDirectory(szWorkingDir)))
+    {
+        return FALSE;
+    }
+
+    return SUCCEEDED(ppf->Save(pszShortcutPath, TRUE));
+}
+
+static BOOL CreatePinnedShortcutPath(LPCWSTR pszFolder, LPCWSTR pszBaseName, LPWSTR pszShortcutPath, UINT cchShortcutPath)
+{
+    WCHAR szCandidate[MAX_PATH];
+    UINT Attempt = 0;
+
+    if (!pszFolder || !pszBaseName || !*pszFolder || !*pszBaseName || !pszShortcutPath || cchShortcutPath == 0)
+        return FALSE;
+
+    do
+    {
+        if (Attempt == 0)
+            StringCchPrintfW(szCandidate, _countof(szCandidate), L"%s\\%s.lnk", pszFolder, pszBaseName);
+        else
+            StringCchPrintfW(szCandidate, _countof(szCandidate), L"%s\\%s (%u).lnk", pszFolder, pszBaseName, Attempt + 1);
+
+        StringCchCopyW(pszShortcutPath, cchShortcutPath, szCandidate);
+        ++Attempt;
+    } while (PathFileExistsW(pszShortcutPath) && Attempt < 100);
+
+    return !PathFileExistsW(pszShortcutPath);
+}
+
+static BOOL CopyShortcutToPinnedFolder(LPCWSTR pszFolder, LPCWSTR pszSourcePath, LPCWSTR pszDisplayName = NULL)
+{
+    WCHAR szDisplayName[MAX_PATH];
+    WCHAR szShortcutPath[MAX_PATH];
+
+    if (!pszFolder || !pszSourcePath || !*pszSourcePath || !PathFileExistsW(pszSourcePath))
+        return FALSE;
+
+    if (pszDisplayName && *pszDisplayName)
+        StringCchCopyW(szDisplayName, _countof(szDisplayName), pszDisplayName);
+    else
+        GetPathDisplayName(pszSourcePath, szDisplayName, _countof(szDisplayName));
+
+    if (!CreatePinnedShortcutPath(pszFolder, szDisplayName, szShortcutPath, _countof(szShortcutPath)))
+        return FALSE;
+
+    return CopyFileW(pszSourcePath, szShortcutPath, TRUE);
+}
+
+static UINT LoadPinnedProgramsFromFolder(WCHAR LinkEntries[][MAX_PATH], WCHAR RecentEntries[][MAX_PATH],
+                                         UINT cEntries, BOOL *pbFolderExists = NULL)
+{
+    WCHAR szFolder[MAX_PATH];
+    WCHAR szSearch[MAX_PATH];
+    WIN32_FIND_DATAW wfd;
+    HANDLE hFind;
+    UINT Count = 0;
+
+    if (pbFolderExists)
+        *pbFolderExists = FALSE;
+
+    if (!GetStartPanelPinnedFolder(szFolder, _countof(szFolder)))
+        return 0;
+
+    if (PathFileExistsW(szFolder))
+    {
+        if (pbFolderExists)
+            *pbFolderExists = TRUE;
+    }
+    else
+    {
+        return 0;
+    }
+
+    StringCchPrintfW(szSearch, _countof(szSearch), L"%s\\*.lnk", szFolder);
+    hFind = FindFirstFileW(szSearch, &wfd);
+    if (hFind == INVALID_HANDLE_VALUE)
+        return 0;
+
+    do
+    {
+        WCHAR szLinkPath[MAX_PATH];
+
+        if ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 || Count >= cEntries)
+            continue;
+
+        StringCchPrintfW(szLinkPath, _countof(szLinkPath), L"%s\\%s", szFolder, wfd.cFileName);
+        StringCchCopyW(LinkEntries[Count], MAX_PATH, szLinkPath);
+        NormalizeStartPanelRecentPath(szLinkPath, RecentEntries[Count], MAX_PATH);
+        ++Count;
+    } while (FindNextFileW(hFind, &wfd));
+
+    FindClose(hFind);
+    return Count;
+}
+
+static BOOL AddTargetAsPinnedShortcut(LPCWSTR pszFolder, LPCWSTR pszTargetPath, LPCWSTR pszDisplayName = NULL)
+{
+    WCHAR szDisplayName[MAX_PATH];
+    WCHAR szShortcutPath[MAX_PATH];
+
+    if (!pszFolder || !pszTargetPath || !*pszTargetPath || !PathFileExistsW(pszTargetPath))
+        return FALSE;
+
+    if (pszDisplayName && *pszDisplayName)
+        StringCchCopyW(szDisplayName, _countof(szDisplayName), pszDisplayName);
+    else
+        GetPathDisplayName(pszTargetPath, szDisplayName, _countof(szDisplayName));
+
+    if (!CreatePinnedShortcutPath(pszFolder, szDisplayName, szShortcutPath, _countof(szShortcutPath)))
+        return FALSE;
+
+    return CreateStartPanelShortcut(szShortcutPath, pszTargetPath);
+}
+
+static BOOL IsPathPinnedToStartPanel(LPCWSTR pszPath, LPWSTR pszPinnedShortcut = NULL, UINT cchPinnedShortcut = 0)
+{
+    WCHAR LinkEntries[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
+    WCHAR RecentEntries[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
+    WCHAR szIdentityPath[MAX_PATH];
+    UINT Count, i;
+
+    if (!GetStartPanelIdentityPath(pszPath, szIdentityPath, _countof(szIdentityPath)))
+        return FALSE;
+
+    Count = LoadPinnedProgramsFromFolder(LinkEntries, RecentEntries, _countof(LinkEntries));
+    for (i = 0; i < Count; ++i)
+    {
+        if (lstrcmpiW(RecentEntries[i], szIdentityPath) == 0 || lstrcmpiW(LinkEntries[i], pszPath) == 0)
+        {
+            if (pszPinnedShortcut && cchPinnedShortcut)
+                StringCchCopyW(pszPinnedShortcut, cchPinnedShortcut, LinkEntries[i]);
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static BOOL PinPathToStartPanel(LPCWSTR pszPath)
+{
+    WCHAR szFolder[MAX_PATH];
+
+    if (!IsStartPanelPinnablePath(pszPath) || !EnsureStartPanelPinnedFolder(szFolder, _countof(szFolder)))
+        return FALSE;
+
+    if (IsPathPinnedToStartPanel(pszPath))
+        return TRUE;
+
+    if (PathMatchSpecW(pszPath, L"*.lnk"))
+        return CopyShortcutToPinnedFolder(szFolder, pszPath);
+
+    return AddTargetAsPinnedShortcut(szFolder, pszPath);
+}
+
+static BOOL UnpinPathFromStartPanel(LPCWSTR pszPath)
+{
+    WCHAR szPinnedShortcut[MAX_PATH];
+
+    if (!IsPathPinnedToStartPanel(pszPath, szPinnedShortcut, _countof(szPinnedShortcut)))
+        return FALSE;
+
+    return DeleteFileW(szPinnedShortcut);
+}
+
+static UINT SeedDefaultPinnedPrograms()
+{
+    static const struct
+    {
+        LPCWSTR pszFileName;
+        LPCWSTR pszDisplayName;
+    } s_DefaultExecutables[] =
+    {
+        { L"iexplore.exe", L"Internet Browser" },
+        { L"notepad.exe", L"Notepad" },
+        { L"mspaint.exe", L"Paint" },
+        { L"calc.exe", L"Calculator" },
+    };
+
+    WCHAR szFolder[MAX_PATH];
+    WCHAR szPath[MAX_PATH];
+    UINT Count = 0;
+    UINT i;
+
+    if (!EnsureStartPanelPinnedFolder(szFolder, _countof(szFolder)))
+        return 0;
+
+    for (i = 0; i < _countof(s_DefaultExecutables) && Count < STARTPANEL_PINNED_LIMIT; ++i)
+    {
+        if (!ResolveStartPanelDefaultTarget(s_DefaultExecutables[i].pszFileName, szPath, _countof(szPath)))
+            continue;
+
+        if (AddTargetAsPinnedShortcut(szFolder, szPath, s_DefaultExecutables[i].pszDisplayName))
+            ++Count;
+    }
+
+    return Count;
+}
+
+static BOOL MigratePinnedProgramsFromRegistry()
+{
+    WCHAR Entries[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
+    WCHAR szFolder[MAX_PATH];
+    BOOL bExists = FALSE;
+    UINT Count;
+    UINT Migrated = 0;
+    UINT i;
+
+    if (!EnsureStartPanelPinnedFolder(szFolder, _countof(szFolder)))
+        return FALSE;
+
+    Count = LoadStartPanelProgramList(s_szPinnedPrograms, Entries, _countof(Entries), &bExists);
+    if (!bExists || Count == 0)
+        return FALSE;
+
+    for (i = 0; i < Count; ++i)
+    {
+        if (AddTargetAsPinnedShortcut(szFolder, Entries[i]))
+            ++Migrated;
+    }
+
+    if (Migrated > 0)
+        SHSetValueW(HKEY_CURRENT_USER, s_szStartPanelKey, s_szPinnedMigrated, REG_DWORD, &Migrated, sizeof(Migrated));
+
+    return Migrated > 0;
+}
+
+static UINT LoadBuiltInPinnedPrograms(WCHAR LinkEntries[][MAX_PATH], WCHAR RecentEntries[][MAX_PATH], UINT cEntries)
+{
+    static const struct
+    {
+        LPCWSTR pszShortcutSubPath;
+        LPCWSTR pszTargetFileName;
+    } s_DefaultItems[] =
+    {
+        { NULL, L"iexplore.exe" },
+        { L"Accessories\\Notepad.lnk", L"notepad.exe" },
+        { L"Accessories\\Paint.lnk", L"mspaint.exe" },
+        { L"Accessories\\Calculator.lnk", L"calc.exe" },
+        { L"Accessories\\WordPad.lnk", L"wordpad.exe" },
     };
 
     WCHAR szPath[MAX_PATH];
     UINT Count = 0;
     UINT i;
 
-    for (i = 0; i < _countof(s_DefaultExecutables) && Count < cEntries; ++i)
+    for (i = 0; i < _countof(s_DefaultItems) && Count < cEntries; ++i)
     {
-        if (SearchPathW(NULL, s_DefaultExecutables[i], NULL, _countof(szPath), szPath, NULL) == 0)
+        BOOL bResolved = FALSE;
+
+        if (s_DefaultItems[i].pszShortcutSubPath)
+            bResolved = ResolveStartPanelProgramsShortcut(s_DefaultItems[i].pszShortcutSubPath, szPath, _countof(szPath));
+
+        if (!bResolved && s_DefaultItems[i].pszTargetFileName)
+            bResolved = ResolveStartPanelDefaultTarget(s_DefaultItems[i].pszTargetFileName, szPath, _countof(szPath));
+
+        if (!bResolved || PathInProgramList(LinkEntries, Count, szPath))
             continue;
 
-        if (PathInProgramList(Entries, Count, szPath))
-            continue;
-
-        StringCchCopyW(Entries[Count], MAX_PATH, szPath);
+        StringCchCopyW(LinkEntries[Count], MAX_PATH, szPath);
+        NormalizeStartPanelRecentPath(szPath, RecentEntries[Count], MAX_PATH);
         ++Count;
     }
 
@@ -199,6 +586,7 @@ static UINT SeedDefaultRecentPrograms(WCHAR Entries[][MAX_PATH], UINT cEntries,
         L"calc.exe",
         L"cmd.exe",
         L"notepad.exe",
+        L"wordpad.exe",
     };
 
     WCHAR szPath[MAX_PATH];
@@ -207,7 +595,7 @@ static UINT SeedDefaultRecentPrograms(WCHAR Entries[][MAX_PATH], UINT cEntries,
 
     for (i = 0; i < _countof(s_DefaultExecutables) && Count < cEntries; ++i)
     {
-        if (SearchPathW(NULL, s_DefaultExecutables[i], NULL, _countof(szPath), szPath, NULL) == 0)
+        if (!ResolveStartPanelDefaultTarget(s_DefaultExecutables[i], szPath, _countof(szPath)))
             continue;
 
         if (PathInProgramList(PinnedEntries, PinnedCount, szPath) ||
@@ -245,6 +633,64 @@ static BOOL UpdateRecentProgramList(LPCWSTR pszPath)
     }
 
     return SaveStartPanelProgramList(s_szRecentPrograms, Updated, min(j, _countof(Updated)));
+}
+
+static BOOL RemoveRecentProgramFromList(LPCWSTR pszPath)
+{
+    WCHAR Entries[STARTPANEL_RECENT_LIMIT][MAX_PATH] = { { 0 } };
+    WCHAR Updated[STARTPANEL_RECENT_LIMIT][MAX_PATH] = { { 0 } };
+    WCHAR szIdentityPath[MAX_PATH];
+    UINT Count, i, j = 0;
+
+    if (!GetStartPanelIdentityPath(pszPath, szIdentityPath, _countof(szIdentityPath)))
+        return FALSE;
+
+    Count = LoadStartPanelProgramList(s_szRecentPrograms, Entries, _countof(Entries));
+    for (i = 0; i < Count && j < _countof(Updated); ++i)
+    {
+        if (lstrcmpiW(Entries[i], szIdentityPath) == 0)
+            continue;
+
+        StringCchCopyW(Updated[j], MAX_PATH, Entries[i]);
+        ++j;
+    }
+
+    return SaveStartPanelProgramList(s_szRecentPrograms, Updated, j);
+}
+
+static void RequestStartMenuRefresh()
+{
+    HWND hwndTray = FindWindowW(L"Shell_TrayWnd", NULL);
+
+    if (hwndTray != NULL)
+        PostMessageW(hwndTray, WM_SETTINGCHANGE, 0, (LPARAM)L"TraySettings");
+}
+
+static HRESULT GetPathContextMenu(HWND hwndOwner, LPCWSTR pszPath, IContextMenu **ppcm)
+{
+    PIDLIST_ABSOLUTE pidlAbsolute = NULL;
+    CComPtr<IShellFolder> psfParent;
+    PCUITEMID_CHILD pidlChild = NULL;
+    HRESULT hr;
+
+    if (!ppcm)
+        return E_POINTER;
+    *ppcm = NULL;
+
+    hr = SHParseDisplayName(pszPath, NULL, &pidlAbsolute, 0, NULL);
+    if (FAILED_UNEXPECTEDLY(hr))
+        return hr;
+
+    hr = SHBindToParent(pidlAbsolute, IID_PPV_ARG(IShellFolder, &psfParent), &pidlChild);
+    if (FAILED_UNEXPECTEDLY(hr))
+    {
+        ILFree(pidlAbsolute);
+        return hr;
+    }
+
+    hr = psfParent->GetUIObjectOf(hwndOwner, 1, &pidlChild, IID_IContextMenu, NULL, (void **)ppcm);
+    ILFree(pidlAbsolute);
+    return hr;
 }
 
 static INT GetPathIconIndex(LPCWSTR pszPath)
@@ -398,7 +844,8 @@ BOOL CMenuToolbarBase::UseStartPanelColumnColors() const
 
 COLORREF CMenuToolbarBase::GetStartPanelColumnColor() const
 {
-    return IsStartPanelShellColumn() ? STARTPANEL_SHELL_BG : STARTPANEL_STATIC_BG;
+    const STARTPANELTHEME& Theme = GetStartPanelTheme();
+    return IsStartPanelShellColumn() ? Theme.crLeftColumn : Theme.crRightColumn;
 }
 
 LRESULT CMenuToolbarBase::OnEraseBackground(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
@@ -460,7 +907,7 @@ HRESULT CMenuToolbarBase::OnCustomDraw(LPNMTBCUSTOMDRAW cdraw, LRESULT * theResu
 
                 clrText = GetSysColor(COLOR_HIGHLIGHTTEXT);
                 if (UseStartPanelColumnColors())
-                    bgBrush = CreateSolidBrush(STARTPANEL_HOT_BG);
+                    bgBrush = CreateSolidBrush(GetStartPanelTheme().crHot);
                 else
                     bgBrush = GetSysColorBrush(m_useFlatMenus ? COLOR_MENUHILIGHT : COLOR_HIGHLIGHT);
             }
@@ -1702,34 +2149,45 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
     if (bTopLevelStartPanel)
     {
         WCHAR PinnedPrograms[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
+        WCHAR PinnedRecentPrograms[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
         WCHAR RecentPrograms[STARTPANEL_RECENT_LIMIT][MAX_PATH] = { { 0 } };
-        BOOL bPinnedExists = FALSE;
         UINT PinnedCount;
         UINT RecentCount;
         UINT RecentVisibleCount = 0;
         UINT AddedCount = 0;
         LPITEMIDLIST pidlPrograms = NULL;
 
-        PinnedCount = LoadStartPanelProgramList(s_szPinnedPrograms, PinnedPrograms, _countof(PinnedPrograms), &bPinnedExists);
-        if (!bPinnedExists || PinnedCount == 0)
+        PinnedCount = LoadPinnedProgramsFromFolder(PinnedPrograms, PinnedRecentPrograms,
+                                                   _countof(PinnedPrograms));
+        if (PinnedCount == 0 && MigratePinnedProgramsFromRegistry())
         {
-            PinnedCount = SeedDefaultPinnedPrograms(PinnedPrograms, _countof(PinnedPrograms));
-            if (PinnedCount > 0)
-                SaveStartPanelProgramList(s_szPinnedPrograms, PinnedPrograms, PinnedCount);
+            PinnedCount = LoadPinnedProgramsFromFolder(PinnedPrograms, PinnedRecentPrograms,
+                                                       _countof(PinnedPrograms));
+        }
+        if (PinnedCount == 0)
+        {
+            SeedDefaultPinnedPrograms();
+            PinnedCount = LoadPinnedProgramsFromFolder(PinnedPrograms, PinnedRecentPrograms,
+                                                       _countof(PinnedPrograms));
+        }
+        if (PinnedCount == 0)
+        {
+            PinnedCount = LoadBuiltInPinnedPrograms(PinnedPrograms, PinnedRecentPrograms,
+                                                    _countof(PinnedPrograms));
         }
 
         RecentCount = LoadStartPanelProgramList(s_szRecentPrograms, RecentPrograms, _countof(RecentPrograms));
         if (RecentCount == 0)
         {
             RecentCount = SeedDefaultRecentPrograms(RecentPrograms, _countof(RecentPrograms),
-                                                    PinnedPrograms, PinnedCount);
+                                                    PinnedRecentPrograms, PinnedCount);
             if (RecentCount > 0)
                 SaveStartPanelProgramList(s_szRecentPrograms, RecentPrograms, RecentCount);
         }
 
         for (UINT i = 0; i < RecentCount; ++i)
         {
-            if (RecentPrograms[i][0] && !PathInProgramList(PinnedPrograms, PinnedCount, RecentPrograms[i]))
+            if (RecentPrograms[i][0] && !PathInProgramList(PinnedRecentPrograms, PinnedCount, RecentPrograms[i]))
                 ++RecentVisibleCount;
         }
 
@@ -1741,7 +2199,7 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
             if (!PinnedPrograms[i][0])
                 continue;
 
-            pData = CreateCustomPathItemData(PinnedPrograms[i]);
+            pData = CreateCustomPathItemData(PinnedPrograms[i], PinnedRecentPrograms[i], TRUE, FALSE);
             if (!pData)
                 continue;
 
@@ -1766,10 +2224,10 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
             STARTPANEL_ITEMDATA *pData;
             WCHAR szText[MAX_PATH];
 
-            if (!RecentPrograms[i][0] || PathInProgramList(PinnedPrograms, PinnedCount, RecentPrograms[i]))
+            if (!RecentPrograms[i][0] || PathInProgramList(PinnedRecentPrograms, PinnedCount, RecentPrograms[i]))
                 continue;
 
-            pData = CreateCustomPathItemData(RecentPrograms[i]);
+            pData = CreateCustomPathItemData(RecentPrograms[i], RecentPrograms[i], FALSE, TRUE);
             if (!pData)
                 continue;
 
@@ -1998,24 +2456,140 @@ HRESULT CMenuSFToolbar::GetShellFolder(DWORD *pdwFlags, LPITEMIDLIST *ppidl, REF
 
 HRESULT CMenuSFToolbar::InternalContextMenu(INT iItem, INT index, DWORD_PTR dwData, POINT pt)
 {
-    HRESULT hr;
+    HRESULT hr = S_FALSE;
     CComPtr<IContextMenu> contextMenu = NULL;
     STARTPANEL_ITEMDATA *pData = reinterpret_cast<STARTPANEL_ITEMDATA*>(dwData);
     LPCITEMIDLIST pidl;
+    WCHAR szPath[MAX_PATH];
+    HWND hwndOwner;
+    BOOL bCanPin = FALSE;
+    BOOL bPinned = FALSE;
+    BOOL bCanRemoveRecent = FALSE;
+    HMENU popup;
+    UINT uCommand;
+    UINT idCmdFirst = 100;
+    UINT idCmdLast = 0x70ff;
+    UINT cmf = CMF_NORMAL;
 
-    if (!pData || pData->bCustomPath || !pData->pidl)
+    if (!pData)
         return S_FALSE;
 
-    pidl = pData->pidl;
+    szPath[0] = UNICODE_NULL;
+    hwndOwner = GetToolbar();
 
-    hr = m_shellFolder->GetUIObjectOf(GetToolbar(), 1, &pidl, IID_NULL_PPV_ARG(IContextMenu, &contextMenu));
-    if (FAILED_UNEXPECTEDLY(hr))
+    if (pData->bCustomPath)
     {
-        return hr;
+        StringCchCopyW(szPath, _countof(szPath), pData->szPath);
+        hr = GetPathContextMenu(hwndOwner, szPath, &contextMenu);
+        bCanRemoveRecent = pData->bStartPanelRecent;
+    }
+    else if (pData->pidl)
+    {
+        pidl = pData->pidl;
+        hr = m_shellFolder->GetUIObjectOf(GetToolbar(), 1, &pidl, IID_NULL_PPV_ARG(IContextMenu, &contextMenu));
+        if (FAILED_UNEXPECTEDLY(hr))
+            hr = S_FALSE;
+
+        SHGetPathFromIDListW(pData->pidl, szPath);
     }
 
-    hr = TrackContextMenu(contextMenu, pt);
+    if (szPath[0] && IsStartPanelPinnablePath(szPath))
+    {
+        bCanPin = TRUE;
+        bPinned = IsPathPinnedToStartPanel(szPath);
+    }
 
+    if (contextMenu.p == NULL && !bCanPin && !bCanRemoveRecent)
+        return S_FALSE;
+
+    popup = CreatePopupMenu();
+    if (!popup)
+        return E_FAIL;
+
+    if (contextMenu.p != NULL)
+    {
+        if (GetKeyState(VK_SHIFT) < 0)
+            cmf |= CMF_EXTENDEDVERBS;
+
+        hr = contextMenu->QueryContextMenu(popup, 0, idCmdFirst, idCmdLast, cmf);
+        if (FAILED_UNEXPECTEDLY(hr))
+        {
+            DestroyMenu(popup);
+            return hr;
+        }
+    }
+
+    if (bCanPin || bCanRemoveRecent)
+    {
+        if (GetMenuItemCount(popup) > 0)
+            InsertMenuW(popup, GetMenuItemCount(popup), MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+        if (bCanPin)
+        {
+            InsertMenuW(popup, GetMenuItemCount(popup), MF_BYPOSITION | MF_STRING,
+                        bPinned ? IDM_STARTPANEL_UNPIN : IDM_STARTPANEL_PIN,
+                        bPinned ? L"Unpin from Start Menu" : L"Pin to Start Menu");
+        }
+
+        if (bCanRemoveRecent)
+        {
+            InsertMenuW(popup, GetMenuItemCount(popup), MF_BYPOSITION | MF_STRING,
+                        IDM_STARTPANEL_REMOVE, L"Remove from this list");
+        }
+    }
+
+    uCommand = m_menuBand->_TrackPopupMenu(popup, pt.x, pt.y);
+
+    if (uCommand == IDM_STARTPANEL_PIN)
+    {
+        m_menuBand->_MenuItemSelect(MPOS_FULLCANCEL);
+        if (PinPathToStartPanel(szPath))
+        {
+            RequestStartMenuRefresh();
+            hr = S_OK;
+        }
+        else
+            hr = E_FAIL;
+    }
+    else if (uCommand == IDM_STARTPANEL_UNPIN)
+    {
+        m_menuBand->_MenuItemSelect(MPOS_FULLCANCEL);
+        if (UnpinPathFromStartPanel(szPath))
+        {
+            RequestStartMenuRefresh();
+            hr = S_OK;
+        }
+        else
+            hr = E_FAIL;
+    }
+    else if (uCommand == IDM_STARTPANEL_REMOVE)
+    {
+        m_menuBand->_MenuItemSelect(MPOS_FULLCANCEL);
+        if (RemoveRecentProgramFromList(pData->szRecentPath[0] ? pData->szRecentPath : szPath))
+        {
+            RequestStartMenuRefresh();
+            hr = S_OK;
+        }
+        else
+            hr = E_FAIL;
+    }
+    else if (uCommand != 0 && contextMenu.p != NULL)
+    {
+        m_menuBand->_MenuItemSelect(MPOS_FULLCANCEL);
+
+        CMINVOKECOMMANDINFO cmi = { sizeof(cmi), 0, NULL };
+        cmi.lpVerb = MAKEINTRESOURCEA(uCommand - idCmdFirst);
+        if (GetKeyState(VK_SHIFT) < 0)
+            cmi.fMask |= CMIC_MASK_SHIFT_DOWN;
+        if (GetKeyState(VK_CONTROL) < 0)
+            cmi.fMask |= CMIC_MASK_CONTROL_DOWN;
+        cmi.nShow = SW_SHOW;
+        hr = contextMenu->InvokeCommand(&cmi);
+    }
+    else
+        hr = S_OK;
+
+    DestroyMenu(popup);
     return hr;
 }
 
@@ -2028,13 +2602,14 @@ HRESULT CMenuSFToolbar::InternalExecuteItem(INT iItem, INT index, DWORD_PTR data
 
     if (pData->bCustomPath)
     {
-        UpdateRecentProgramList(pData->szPath);
+        UpdateRecentProgramList(pData->szRecentPath[0] ? pData->szRecentPath : pData->szPath);
         return reinterpret_cast<INT_PTR>(ShellExecuteW(NULL, NULL, pData->szPath, NULL, NULL, SW_SHOWNORMAL)) > 32 ? S_OK : E_FAIL;
     }
 
     if (pData->pidl)
     {
         WCHAR szPath[MAX_PATH];
+        WCHAR szRecentPath[MAX_PATH];
         LPCITEMIDLIST pidl = pData->pidl;
         SFGAOF attrs = SFGAO_FOLDER;
 
@@ -2042,7 +2617,8 @@ HRESULT CMenuSFToolbar::InternalExecuteItem(INT iItem, INT index, DWORD_PTR data
             !(attrs & SFGAO_FOLDER) &&
             SHGetPathFromIDListW(pData->pidl, szPath))
         {
-            UpdateRecentProgramList(szPath);
+            if (NormalizeStartPanelRecentPath(szPath, szRecentPath, _countof(szRecentPath)))
+                UpdateRecentProgramList(szRecentPath);
         }
     }
 

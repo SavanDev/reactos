@@ -185,6 +185,7 @@ public:
     HRESULT _CallCBWithItemPidl(LPITEMIDLIST pidl, UINT uMsg, WPARAM wParam, LPARAM lParam);
     HRESULT _TrackSubMenu(HMENU popup, INT x, INT y, RECT& rcExclude);
     HRESULT _TrackContextMenu(IContextMenu * popup, INT x, INT y);
+    UINT _TrackPopupMenu(HMENU popup, INT x, INT y);
     HRESULT _GetTopLevelWindow(HWND*topLevel);
     HRESULT _ChangeHotItem(CMenuToolbarBase * tb, INT id, DWORD dwFlags);
     HRESULT _ChangePopupItem(CMenuToolbarBase * tb, INT id);

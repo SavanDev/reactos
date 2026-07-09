@@ -45,10 +45,49 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(CMenuDeskBar);
 
-#define STARTPANEL_HEADER_HEIGHT 32
-#define STARTPANEL_MIN_WIDTH     300
-#define STARTPANEL_HEADER_DARK   RGB(11, 63, 155)
-#define STARTPANEL_HEADER_LIGHT  RGB(74, 137, 220)
+/* These command ids are duplicated from CStartMenu.cpp and must match the
+ * tray/start menu resources exactly. */
+#define IDM_LOGOFF   402
+#define IDM_SHUTDOWN 506
+#define STARTPANEL_HIT_NONE      0
+#define STARTPANEL_HIT_LOGOFF    1
+#define STARTPANEL_HIT_SHUTDOWN  2
+
+static BOOL GetMenuItemTextByCommand(HMENU hMenu, UINT uId, LPWSTR pszText, UINT cchText)
+{
+    MENUITEMINFOW mii = { sizeof(mii) };
+
+    if (!hMenu || !pszText || cchText == 0)
+        return FALSE;
+
+    mii.fMask = MIIM_STRING;
+    mii.dwTypeData = pszText;
+    mii.cch = cchText;
+    return GetMenuItemInfoW(hMenu, uId, FALSE, &mii);
+}
+
+static VOID SanitizeStartPanelButtonText(LPWSTR pszText)
+{
+    LPWSTR pRead, pWrite;
+
+    if (!pszText || !*pszText)
+        return;
+
+    for (pRead = pszText, pWrite = pszText; *pRead; ++pRead)
+    {
+        if (*pRead == L'&')
+            continue;
+        if (*pRead == L'\t' || *pRead == L'%')
+            break;
+
+        *pWrite++ = *pRead;
+    }
+
+    while (pWrite > pszText && (pWrite[-1] == L'.' || pWrite[-1] == L' '))
+        --pWrite;
+
+    *pWrite = UNICODE_NULL;
+}
 
 CMenuDeskBar::CMenuDeskBar() :
     m_Client(NULL),
@@ -57,8 +96,13 @@ CMenuDeskBar::CMenuDeskBar() :
     m_Banner(NULL),
     m_Shown(FALSE),
     m_ShowFlags(0),
-    m_didAddRef(FALSE)
+    m_didAddRef(FALSE),
+    m_StartPanelHotButton(STARTPANEL_HIT_NONE),
+    m_StartPanelTrackingMouse(FALSE)
 {
+    ZeroMemory(&m_StartPanelRects, sizeof(m_StartPanelRects));
+    m_szLogOff[0] = UNICODE_NULL;
+    m_szShutdown[0] = UNICODE_NULL;
 }
 
 CMenuDeskBar::~CMenuDeskBar()
@@ -77,7 +121,136 @@ BOOL CMenuDeskBar::_IsStartPanelLayout() const
 
 UINT CMenuDeskBar::_GetStartPanelHeaderHeight() const
 {
-    return _IsStartPanelLayout() ? STARTPANEL_HEADER_HEIGHT : 0;
+    return _IsStartPanelLayout() ? GetStartPanelTheme().cyHeader : 0;
+}
+
+UINT CMenuDeskBar::_GetStartPanelFooterHeight() const
+{
+    return _IsStartPanelLayout() ? GetStartPanelTheme().cyFooter : 0;
+}
+
+VOID CMenuDeskBar::_GetStartPanelRects(STARTPANELLAYOUTRECTS *pRects) const
+{
+    const STARTPANELTHEME& Theme = GetStartPanelTheme();
+    RECT rc;
+    LONG cxContent;
+
+    ZeroMemory(pRects, sizeof(*pRects));
+    GetClientRect(&rc);
+    pRects->rcClient = rc;
+
+    pRects->rcHeader = rc;
+    pRects->rcHeader.bottom = min(rc.bottom, rc.top + Theme.cyHeader);
+
+    pRects->rcFooter = rc;
+    pRects->rcFooter.top = max(rc.top, rc.bottom - Theme.cyFooter);
+
+    pRects->rcContent = rc;
+    pRects->rcContent.top = pRects->rcHeader.bottom;
+    pRects->rcContent.bottom = max(pRects->rcContent.top, pRects->rcFooter.top);
+
+    pRects->rcAvatar = pRects->rcHeader;
+    pRects->rcAvatar.right -= Theme.cxAvatarPadding;
+    pRects->rcAvatar.left = max(pRects->rcAvatar.left, pRects->rcAvatar.right - Theme.cxAvatar);
+    pRects->rcAvatar.top += Theme.cyHeaderPadding;
+    pRects->rcAvatar.bottom = min(pRects->rcHeader.bottom - Theme.cyHeaderPadding, pRects->rcAvatar.top + Theme.cyAvatar);
+
+    pRects->rcUserText = pRects->rcHeader;
+    pRects->rcUserText.left += Theme.cxHeaderPadding;
+    pRects->rcUserText.top += Theme.cyHeaderPadding;
+    pRects->rcUserText.right = max(pRects->rcUserText.left, pRects->rcAvatar.left - Theme.cxHeaderPadding);
+    pRects->rcUserText.bottom = pRects->rcHeader.bottom - Theme.cyHeaderPadding;
+
+    cxContent = max(0, pRects->rcContent.right - pRects->rcContent.left - Theme.cxColumnGap);
+
+    pRects->rcLeftColumn = pRects->rcContent;
+    pRects->rcLeftColumn.right = pRects->rcLeftColumn.left + min(Theme.cxLeftColumn, cxContent);
+
+    pRects->rcRightColumn = pRects->rcContent;
+    pRects->rcRightColumn.left = min(pRects->rcContent.right, pRects->rcLeftColumn.right + Theme.cxColumnGap);
+
+    pRects->rcLogOffButton = pRects->rcFooter;
+    pRects->rcTurnOffButton = pRects->rcFooter;
+
+    pRects->rcTurnOffButton.right -= Theme.cyFooterPadding;
+    pRects->rcTurnOffButton.left = max(pRects->rcTurnOffButton.left,
+                                       pRects->rcTurnOffButton.right - Theme.cxTurnOffButton);
+    pRects->rcTurnOffButton.top += Theme.cyFooterPadding;
+    pRects->rcTurnOffButton.bottom -= Theme.cyFooterPadding;
+
+    pRects->rcLogOffButton.right = max(pRects->rcFooter.left,
+                                       pRects->rcTurnOffButton.left - Theme.cxFooterGap);
+    pRects->rcLogOffButton.left = max(pRects->rcFooter.left + Theme.cyFooterPadding,
+                                      pRects->rcLogOffButton.right - Theme.cxLogOffButton);
+    pRects->rcLogOffButton.top += Theme.cyFooterPadding;
+    pRects->rcLogOffButton.bottom -= Theme.cyFooterPadding;
+}
+
+HRESULT CMenuDeskBar::_LoadStartPanelFooterStrings()
+{
+    CComPtr<ITrayPriv> trayPriv;
+    HMENU hMenu = NULL;
+
+    if (m_szLogOff[0] && m_szShutdown[0])
+        return S_OK;
+
+    if (m_Site.p == NULL || FAILED(m_Site->QueryInterface(IID_PPV_ARG(ITrayPriv, &trayPriv))) || trayPriv.p == NULL)
+        return E_FAIL;
+
+    if (FAILED(trayPriv->AppendMenu(&hMenu)) || !hMenu)
+        return E_FAIL;
+
+    GetMenuItemTextByCommand(hMenu, IDM_LOGOFF, m_szLogOff, _countof(m_szLogOff));
+    GetMenuItemTextByCommand(hMenu, IDM_SHUTDOWN, m_szShutdown, _countof(m_szShutdown));
+    SanitizeStartPanelButtonText(m_szLogOff);
+    SanitizeStartPanelButtonText(m_szShutdown);
+    DestroyMenu(hMenu);
+    return S_OK;
+}
+
+VOID CMenuDeskBar::_InvalidateStartPanelFooter()
+{
+    if (!_IsStartPanelLayout())
+        return;
+
+    InvalidateRect(&m_StartPanelRects.rcFooter, FALSE);
+}
+
+INT CMenuDeskBar::_StartPanelHitTestFooterButton(POINT pt) const
+{
+    if (!_IsStartPanelLayout())
+        return STARTPANEL_HIT_NONE;
+
+    if (PtInRect(&m_StartPanelRects.rcLogOffButton, pt))
+        return STARTPANEL_HIT_LOGOFF;
+    if (PtInRect(&m_StartPanelRects.rcTurnOffButton, pt))
+        return STARTPANEL_HIT_SHUTDOWN;
+    return STARTPANEL_HIT_NONE;
+}
+
+VOID CMenuDeskBar::_SetStartPanelHotButton(INT iButton)
+{
+    if (m_StartPanelHotButton == iButton)
+        return;
+
+    m_StartPanelHotButton = iButton;
+    _InvalidateStartPanelFooter();
+}
+
+HRESULT CMenuDeskBar::_ExecuteStartPanelFooterCommand(UINT uId)
+{
+    CComPtr<ITrayPriv> trayPriv;
+    HWND hwndTray = NULL;
+
+    if (m_Site.p == NULL || FAILED(m_Site->QueryInterface(IID_PPV_ARG(ITrayPriv, &trayPriv))) || trayPriv.p == NULL)
+        return E_FAIL;
+
+    if (FAILED(IUnknown_GetWindow(trayPriv, &hwndTray)) || !hwndTray)
+        return E_FAIL;
+
+    ::PostMessageW(hwndTray, WM_COMMAND, uId, 0);
+    OnSelect(MPOS_FULLCANCEL);
+    return S_OK;
 }
 
 LRESULT CMenuDeskBar::_OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
@@ -386,9 +559,11 @@ HRESULT STDMETHODCALLTYPE CMenuDeskBar::Popup(POINTL *ppt, RECTL *prcExclude, MP
 
     if (_IsStartPanelLayout())
     {
-        rc.bottom += _GetStartPanelHeaderHeight();
-        if ((rc.right - rc.left) < STARTPANEL_MIN_WIDTH)
-            rc.right = rc.left + STARTPANEL_MIN_WIDTH;
+        const STARTPANELTHEME& Theme = GetStartPanelTheme();
+        rc.bottom += _GetStartPanelHeaderHeight() + _GetStartPanelFooterHeight();
+        if ((rc.right - rc.left) < Theme.cxMinPanel)
+            rc.right = rc.left + Theme.cxMinPanel;
+        _LoadStartPanelFooterStrings();
     }
 
     RECT rcWorkArea;
@@ -714,7 +889,8 @@ LRESULT CMenuDeskBar::_OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHa
 
         if (_IsStartPanelLayout())
         {
-            rc.top += _GetStartPanelHeaderHeight();
+            _GetStartPanelRects(&m_StartPanelRects);
+            rc = m_StartPanelRects.rcContent;
         }
         else if (m_Banner && m_IconSize != BMICON_SMALL)
         {
@@ -757,28 +933,42 @@ LRESULT CMenuDeskBar::_OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bH
 
     if (_IsStartPanelLayout())
     {
+        const STARTPANELTHEME& Theme = GetStartPanelTheme();
         WCHAR szUser[128];
-        RECT rc, rcHeader, rcText;
+        RECT rcHeader, rcText;
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(&ps);
-        HBRUSH hbrHeader = CreateSolidBrush(STARTPANEL_HEADER_DARK);
-        HBRUSH hbrAccent = CreateSolidBrush(STARTPANEL_HEADER_LIGHT);
+        HBRUSH hbrHeader = CreateSolidBrush(Theme.crHeaderDark);
+        HBRUSH hbrAccent = CreateSolidBrush(Theme.crHeaderLight);
+        HBRUSH hbrFooter = CreateSolidBrush(Theme.crFooterDark);
+        HBRUSH hbrFooterLight = CreateSolidBrush(Theme.crFooterLight);
+        HBRUSH hbrBorder = CreateSolidBrush(Theme.crBorder);
+        HBRUSH hbrButtonEdge = CreateSolidBrush(Theme.crFooterButtonEdge);
         HFONT hFont = NULL, hFontOld;
         LOGFONTW lf;
         DWORD cchUser = _countof(szUser);
+        HFONT hFooterOld;
+        HICON hIcon;
 
-        GetClientRect(&rc);
-        rcHeader = rc;
-        rcHeader.bottom = min(rc.bottom, (LONG)_GetStartPanelHeaderHeight());
+        _GetStartPanelRects(&m_StartPanelRects);
+
+        rcHeader = m_StartPanelRects.rcHeader;
         FillRect(hdc, &rcHeader, hbrHeader);
 
-        rcText = rcHeader;
-        rcText.left += 12;
-        rcText.right -= 12;
+        rcText = m_StartPanelRects.rcUserText;
 
         RECT rcAccent = rcHeader;
         rcAccent.left = max(rcAccent.left, rcAccent.right - 72);
         FillRect(hdc, &rcAccent, hbrAccent);
+
+        FillRect(hdc, &m_StartPanelRects.rcFooter, hbrFooter);
+
+        RECT rcLine = rcHeader;
+        rcLine.top = rcLine.bottom - 1;
+        FillRect(hdc, &rcLine, hbrBorder);
+        rcLine = m_StartPanelRects.rcFooter;
+        rcLine.bottom = rcLine.top + 1;
+        FillRect(hdc, &rcLine, hbrFooterLight);
 
         if (!GetUserNameW(szUser, &cchUser))
             szUser[0] = UNICODE_NULL;
@@ -796,8 +986,78 @@ LRESULT CMenuDeskBar::_OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bH
         DrawTextW(hdc, szUser, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         SelectObject(hdc, hFontOld);
 
+        hIcon = (HICON)LoadImageW(shell32_hInstance, MAKEINTRESOURCEW(IDI_SHELL_USERS2), IMAGE_ICON,
+                                  Theme.cxAvatar, Theme.cyAvatar, LR_SHARED);
+        if (hIcon)
+        {
+            DrawIconEx(hdc, m_StartPanelRects.rcAvatar.left, m_StartPanelRects.rcAvatar.top,
+                       hIcon, Theme.cxAvatar, Theme.cyAvatar, 0, NULL, DI_NORMAL);
+        }
+
+        if (GetObjectW(GetStockObject(DEFAULT_GUI_FONT), sizeof(lf), &lf) == sizeof(lf))
+        {
+            lf.lfWeight = FW_NORMAL;
+            lf.lfHeight = -12;
+            DeleteObject(hFont);
+            hFont = CreateFontIndirectW(&lf);
+        }
+
+        hFooterOld = (HFONT)SelectObject(hdc, hFont ? hFont : GetStockObject(DEFAULT_GUI_FONT));
+        SetTextColor(hdc, Theme.crFooterText);
+        SetBkMode(hdc, TRANSPARENT);
+
+        {
+            RECT rcButtonText = m_StartPanelRects.rcLogOffButton;
+            HBRUSH hbrButton = CreateSolidBrush(m_StartPanelHotButton == STARTPANEL_HIT_LOGOFF ?
+                                                Theme.crFooterButtonHot : Theme.crFooterButton);
+            HICON hButtonIcon = (HICON)LoadImageW(shell32_hInstance, MAKEINTRESOURCEW(IDI_SHELL_LOGOFF1),
+                                                  IMAGE_ICON, 16, 16, LR_SHARED);
+            FillRect(hdc, &m_StartPanelRects.rcLogOffButton, hbrButton);
+            FrameRect(hdc, &m_StartPanelRects.rcLogOffButton, hbrButtonEdge);
+            rcButtonText.left += 8;
+            if (hButtonIcon)
+            {
+                INT yIcon = m_StartPanelRects.rcLogOffButton.top +
+                            ((m_StartPanelRects.rcLogOffButton.bottom - m_StartPanelRects.rcLogOffButton.top) - 16) / 2;
+                DrawIconEx(hdc, m_StartPanelRects.rcLogOffButton.left + 6, yIcon, hButtonIcon, 16, 16, 0, NULL, DI_NORMAL);
+                rcButtonText.left += 18;
+            }
+            rcButtonText.right -= 6;
+            DrawTextW(hdc, m_szLogOff[0] ? m_szLogOff : L"Log Off", -1, &rcButtonText,
+                      DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            DeleteObject(hbrButton);
+        }
+
+        {
+            RECT rcButtonText = m_StartPanelRects.rcTurnOffButton;
+            HBRUSH hbrButton = CreateSolidBrush(m_StartPanelHotButton == STARTPANEL_HIT_SHUTDOWN ?
+                                                Theme.crFooterButtonHot : Theme.crFooterButton);
+            HICON hButtonIcon = (HICON)LoadImageW(shell32_hInstance, MAKEINTRESOURCEW(IDI_SHELL_TURN_OFF),
+                                                  IMAGE_ICON, 16, 16, LR_SHARED);
+            FillRect(hdc, &m_StartPanelRects.rcTurnOffButton, hbrButton);
+            FrameRect(hdc, &m_StartPanelRects.rcTurnOffButton, hbrButtonEdge);
+            rcButtonText.left += 8;
+            if (hButtonIcon)
+            {
+                INT yIcon = m_StartPanelRects.rcTurnOffButton.top +
+                            ((m_StartPanelRects.rcTurnOffButton.bottom - m_StartPanelRects.rcTurnOffButton.top) - 16) / 2;
+                DrawIconEx(hdc, m_StartPanelRects.rcTurnOffButton.left + 6, yIcon, hButtonIcon, 16, 16, 0, NULL, DI_NORMAL);
+                rcButtonText.left += 18;
+            }
+            rcButtonText.right -= 6;
+            DrawTextW(hdc, m_szShutdown[0] ? m_szShutdown : L"Turn Off Computer", -1, &rcButtonText,
+                      DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            DeleteObject(hbrButton);
+        }
+
+        SelectObject(hdc, hFooterOld);
+
         if (hFont)
             DeleteObject(hFont);
+        DeleteObject(hbrButtonEdge);
+        DeleteObject(hbrBorder);
+        DeleteObject(hbrFooterLight);
+        DeleteObject(hbrFooter);
         DeleteObject(hbrAccent);
         DeleteObject(hbrHeader);
         EndPaint(&ps);
@@ -920,6 +1180,54 @@ LRESULT CMenuDeskBar::_OnNcPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &
 LRESULT CMenuDeskBar::_OnClose(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
 {
     /* Prevent the CMenuDeskBar from destroying on being sent a WM_CLOSE */
+    return 0;
+}
+
+LRESULT CMenuDeskBar::_OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
+{
+    if (_IsStartPanelLayout())
+    {
+        TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
+        POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+
+        if (!m_StartPanelTrackingMouse)
+        {
+            TrackMouseEvent(&tme);
+            m_StartPanelTrackingMouse = TRUE;
+        }
+
+        _SetStartPanelHotButton(_StartPanelHitTestFooterButton(pt));
+    }
+
+    bHandled = FALSE;
+    return 0;
+}
+
+LRESULT CMenuDeskBar::_OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
+{
+    m_StartPanelTrackingMouse = FALSE;
+    _SetStartPanelHotButton(STARTPANEL_HIT_NONE);
+    return 0;
+}
+
+LRESULT CMenuDeskBar::_OnLButtonUp(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
+{
+    POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+    INT iHit = _StartPanelHitTestFooterButton(pt);
+
+    switch (iHit)
+    {
+    case STARTPANEL_HIT_LOGOFF:
+        _ExecuteStartPanelFooterCommand(IDM_LOGOFF);
+        return 0;
+    case STARTPANEL_HIT_SHUTDOWN:
+        _ExecuteStartPanelFooterCommand(IDM_SHUTDOWN);
+        return 0;
+    default:
+        break;
+    }
+
+    bHandled = FALSE;
     return 0;
 }
 

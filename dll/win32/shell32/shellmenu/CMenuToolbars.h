@@ -162,7 +162,6 @@ public:
 
 protected:
     virtual HRESULT OnDeletingButton(const NMTOOLBAR * tb) override;
-    virtual BOOL IsStartPanelShellColumn() const override { return TRUE; }
 
     virtual HRESULT InternalGetTooltip(INT iItem, INT index, DWORD_PTR dwData, LPWSTR pszText, INT cchTextMax) override;
     virtual HRESULT InternalExecuteItem(INT iItem, INT index, DWORD_PTR dwData) override;
@@ -190,6 +189,7 @@ public:
 
 protected:
     virtual HRESULT OnDeletingButton(const NMTOOLBAR * tb) override;
+    virtual BOOL IsStartPanelShellColumn() const override { return TRUE; }
 
     virtual HRESULT InternalGetTooltip(INT iItem, INT index, DWORD_PTR dwData, LPWSTR pszText, INT cchTextMax) override;
     virtual HRESULT InternalExecuteItem(INT iItem, INT index, DWORD_PTR dwData) override;
