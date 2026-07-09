@@ -998,6 +998,9 @@ BEGIN
     IDS_EXE_DESCRIPTION "Description:"
 
     IDS_MENU_EMPTY "(Empty)"
+    IDS_STARTPANEL_PIN "Pin to Start menu"
+    IDS_STARTPANEL_UNPIN "Unpin from Start menu"
+    IDS_STARTPANEL_REMOVEITEM "Remove from this list"
     IDS_OBJECTS "%d Objects"
     IDS_OBJECTS_SELECTED "%d Objects Selected"
 

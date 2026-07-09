@@ -268,6 +268,11 @@
 
 #define IDS_MENU_EMPTY           34561
 
+/* XP-style start panel (outside of any Microsoft range to avoid collisions) */
+#define IDS_STARTPANEL_PIN           60010
+#define IDS_STARTPANEL_UNPIN         60011
+#define IDS_STARTPANEL_REMOVEITEM    60012
+
 /* Note: those strings are referenced from the registry */
 #define IDS_RECYCLEBIN_FOLDER_NAME 8964
 #define IDS_PRINTERS_DESCRIPTION   12696
