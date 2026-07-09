@@ -103,3 +103,66 @@ HRESULT WINAPI RSHELL_CMenuBand_CreateInstance(REFIID riid, LPVOID *ppv);
 HRESULT WINAPI RSHELL_CMergedFolder_CreateInstance(REFIID riid, LPVOID *ppv);
 
 }
+
+struct STARTPANELTHEME
+{
+    LONG cxMinPanel;
+    LONG cxLeftColumn;
+    LONG cxRightColumn;
+    LONG cxColumnGap;
+    LONG cyHeader;
+    LONG cyFooter;
+    LONG cxHeaderPadding;
+    LONG cyHeaderPadding;
+    LONG cxAvatar;
+    LONG cyAvatar;
+    LONG cxAvatarPadding;
+    LONG cyFooterPadding;
+    LONG cxFooterGap;
+    LONG cxLogOffButton;
+    LONG cxTurnOffButton;
+    COLORREF crHeaderDark;
+    COLORREF crHeaderLight;
+    COLORREF crFooterDark;
+    COLORREF crFooterLight;
+    COLORREF crFooterButton;
+    COLORREF crFooterButtonHot;
+    COLORREF crFooterButtonEdge;
+    COLORREF crFooterText;
+    COLORREF crLeftColumn;
+    COLORREF crRightColumn;
+    COLORREF crHot;
+    COLORREF crBorder;
+};
+
+struct STARTPANELLAYOUTRECTS
+{
+    RECT rcClient;
+    RECT rcHeader;
+    RECT rcContent;
+    RECT rcFooter;
+    RECT rcAvatar;
+    RECT rcUserText;
+    RECT rcLeftColumn;
+    RECT rcRightColumn;
+    RECT rcLogOffButton;
+    RECT rcTurnOffButton;
+};
+
+inline const STARTPANELTHEME& GetStartPanelTheme()
+{
+    static const STARTPANELTHEME Theme =
+    {
+        380, 185, 183, 1,
+        54, 44,
+        12, 5,
+        34, 34, 10,
+        8, 8,
+        108, 124,
+        RGB(11, 63, 155), RGB(74, 137, 220),
+        RGB(61, 111, 197), RGB(48, 92, 173),
+        RGB(237, 240, 246), RGB(255, 255, 255), RGB(48, 82, 144), RGB(0, 0, 0),
+        RGB(255, 255, 255), RGB(232, 228, 218), RGB(49, 106, 197), RGB(106, 141, 189)
+    };
+    return Theme;
+}

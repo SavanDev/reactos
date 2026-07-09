@@ -206,14 +206,6 @@ private:
         AppendCommandFromMenu(hMenu, hClassicMenu, IDM_SEARCH);
         AppendCommandFromMenu(hMenu, hClassicMenu, IDM_HELPANDSUPPORT);
         AppendCommandFromMenu(hMenu, hClassicMenu, IDM_RUN);
-        if (GetMenuItemCount(hMenu) > cItems)
-            AppendSeparatorIfNeeded(hMenu);
-
-        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_SYNCHRONIZE);
-        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_LOGOFF);
-        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_DISCONNECT);
-        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_UNDOCKCOMPUTER);
-        AppendCommandFromMenu(hMenu, hClassicMenu, IDM_SHUTDOWN);
         TrimTrailingSeparator(hMenu);
 
         return hMenu;

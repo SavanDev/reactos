@@ -71,8 +71,6 @@ CMenuBand::~CMenuBand()
 BOOL CMenuBand::IsStartPanelLayout() const
 {
     return (m_dwFlags & (SMINIT_TOPLEVEL | SMINIT_VERTICAL)) == (SMINIT_TOPLEVEL | SMINIT_VERTICAL) &&
-           m_staticToolbar != NULL &&
-           m_SFToolbar != NULL &&
            SHELL_GetSetting(SSF_STARTPANELON, fStartPanelOn);
 }
 
@@ -298,20 +296,13 @@ HRESULT STDMETHODCALLTYPE CMenuBand::OnPosRectChangeDB(RECT *prc)
 
     if (IsStartPanelLayout())
     {
-        const int cxGap = 1;
-        const int cxPadding = 16;
+        const STARTPANELTHEME& Theme = GetStartPanelTheme();
+        const int cxGap = Theme.cxColumnGap;
         int cx = prc->right - prc->left;
         int cy = prc->bottom - prc->top;
         int cxAvail = max(0, cx - cxGap);
-        int cxShell = maxShlFld.cx + cxPadding;
-        int cxStatic = maxStatic.cx + cxPadding;
-        int cxIdeal = max(1, cxShell + cxStatic);
-
-        if (cxIdeal > cxAvail && cxAvail > 0)
-            cxShell = MulDiv(cxAvail, cxShell, cxIdeal);
-
-        cxShell = min(cxShell, cxAvail);
-        cxStatic = cxAvail - cxShell;
+        int cxShell = min(Theme.cxLeftColumn, cxAvail);
+        int cxStatic = max(0, cxAvail - cxShell);
 
         if (cxAvail > 1 && cxStatic < 1)
         {
@@ -408,12 +399,11 @@ HRESULT STDMETHODCALLTYPE  CMenuBand::GetBandInfo(
 
     if ((m_dwFlags & SMINIT_VERTICAL) && IsStartPanelLayout())
     {
-        const int cxGap = 1;
-        const int cxPadding = 16;
+        const STARTPANELTHEME& Theme = GetStartPanelTheme();
 
-        pdbi->ptMinSize.x = minStatic.cx + minShlFld.cx + cxPadding + cxGap;
+        pdbi->ptMinSize.x = Theme.cxLeftColumn + Theme.cxRightColumn + Theme.cxColumnGap;
         pdbi->ptMinSize.y = max(minStatic.cy, minShlFld.cy);
-        pdbi->ptMaxSize.x = maxStatic.cx + maxShlFld.cx + cxPadding + cxGap;
+        pdbi->ptMaxSize.x = max(maxStatic.cx + maxShlFld.cx + Theme.cxColumnGap, Theme.cxMinPanel);
         pdbi->ptMaxSize.y = max(maxStatic.cy, maxShlFld.cy);
         pdbi->dwModeFlags = DBIMF_VARIABLEHEIGHT;
     }
@@ -462,13 +452,7 @@ HRESULT STDMETHODCALLTYPE  CMenuBand::ShowDW(BOOL fShow)
             return hr;
     }
 
-    if (fShow)
-    {
-        hr = _CallCB(SMC_INITMENU, 0, 0);
-        if (FAILED_UNEXPECTEDLY(hr))
-            return hr;
-    }
-    else if (m_parentBand)
+    if (!fShow && m_parentBand)
     {
         m_parentBand->SetClient(NULL);
     }
@@ -898,14 +882,7 @@ HRESULT CMenuBand::_TrackContextMenu(IContextMenu * contextMenu, INT x, INT y)
         return hr;
     }
 
-    HWND hwnd = m_menuOwner ? m_menuOwner : m_topLevelWindow;
-
-    m_focusManager->PushTrackedPopup(popup);
-
-    TRACE("Before Tracking\n");
-    uCommand = ::TrackPopupMenuEx(popup, TPM_RETURNCMD, x, y, hwnd, NULL);
-
-    m_focusManager->PopTrackedPopup(popup);
+    uCommand = _TrackPopupMenu(popup, x, y);
 
     if (uCommand != 0)
     {
@@ -931,6 +908,23 @@ HRESULT CMenuBand::_TrackContextMenu(IContextMenu * contextMenu, INT x, INT y)
 
     DestroyMenu(popup);
     return hr;
+}
+
+UINT CMenuBand::_TrackPopupMenu(HMENU popup, INT x, INT y)
+{
+    HWND hwnd = m_menuOwner ? m_menuOwner : m_topLevelWindow;
+    UINT uCommand;
+
+    if (!popup)
+        return 0;
+
+    m_focusManager->PushTrackedPopup(popup);
+
+    TRACE("Before Tracking\n");
+    uCommand = ::TrackPopupMenuEx(popup, TPM_RETURNCMD, x, y, hwnd, NULL);
+
+    m_focusManager->PopTrackedPopup(popup);
+    return uCommand;
 }
 
 HRESULT CMenuBand::_GetTopLevelWindow(HWND*topLevel)
