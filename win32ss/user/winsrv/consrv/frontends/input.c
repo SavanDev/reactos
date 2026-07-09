@@ -183,7 +183,7 @@ ConioEffectiveCursorSize(PCONSRV_CONSOLE Console, DWORD Scale)
 {
     DWORD Size = (Console->ActiveBuffer->CursorInfo.dwSize * Scale + 99) / 100;
     /* If line input in progress, perhaps adjust for insert toggle */
-    if (Console->LineBuffer && !Console->LineComplete && (Console->InsertMode ? !Console->LineInsertToggle : Console->LineInsertToggle))
+    if (Console->LineDiscipline.Buffer && !Console->LineDiscipline.Complete && (Console->LineDiscipline.InsertMode ? !Console->LineDiscipline.InsertToggle : Console->LineDiscipline.InsertToggle))
         return (Size * 2 <= Scale) ? (Size * 2) : (Size / 2);
     return Size;
 }

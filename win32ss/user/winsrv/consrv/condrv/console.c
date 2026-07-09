@@ -3,7 +3,7 @@
  * PROJECT:         ReactOS Console Driver DLL
  * FILE:            win32ss/user/winsrv/consrv/condrv/console.c
  * PURPOSE:         Console Management Functions
- * PROGRAMMERS:     Gé van Geldorp
+ * PROGRAMMERS:     Ge van Geldorp
  *                  Jeffrey Morlan
  *                  Hermes Belusca-Maito (hermes.belusca@sfr.fr)
  *                  Katayama Hirofumi MZ (katayama.hirofumi.mz@gmail.com)
@@ -186,6 +186,9 @@ ConDrvAttachTerminal(IN PCONSOLE Console,
         ResetTerminal(Console);
         return Status;
     }
+
+    /* Keep the caller-side terminal shim synchronized with the hosted frontend. */
+    *Terminal = Console->TermIFace;
 
     /* Copy buffer contents to screen */
     // Terminal.Draw();

@@ -238,12 +238,24 @@ ConSrvDeinitTerminal(IN OUT PTERMINAL Terminal)
 {
     NTSTATUS Status = STATUS_SUCCESS;
     PFRONTEND FrontEnd = Terminal->Context;
+    PCONSRV_CONSOLE ConSrvConsole = NULL;
+
+    if (FrontEnd != NULL && Terminal->Console != NULL)
+        ConSrvConsole = (PCONSRV_CONSOLE)Terminal->Console;
 
     /* Reset the ConSrv terminal */
     Terminal->Context = NULL;
+    Terminal->Console = NULL;
     Terminal->Vtbl = NULL;
 
-    /* Unload the frontend */
+    /* A hosted frontend is owned by the console lifecycle. */
+    if (ConSrvConsole != NULL &&
+        FrontEnd == &ConSrvConsole->FrontendHost.FrontEnd)
+    {
+        return STATUS_SUCCESS;
+    }
+
+    /* Unload the detached frontend */
     if (FrontEnd != NULL)
     {
         Status = ConSrvUnloadFrontEnd(FrontEnd);
@@ -253,42 +265,86 @@ ConSrvDeinitTerminal(IN OUT PTERMINAL Terminal)
     return Status;
 }
 
-
 /* CONSRV TERMINAL INTERFACE **************************************************/
+
+static VOID
+ConSrvSetFrontEndState(IN PCONSRV_CONSOLE Console,
+                       IN CONSOLE_FRONTEND_STATE State)
+{
+    ASSERT(Console != NULL);
+    DPRINT("CONSRV: Console %p frontend state %lu -> %lu\n",
+           Console,
+           Console->FrontendHost.State,
+           State);
+    Console->FrontendHost.State = State;
+}
+
+static VOID
+ConSrvResetFrontEndHost(IN PCONSRV_CONSOLE Console)
+{
+    ASSERT(Console != NULL);
+    RtlZeroMemory(&Console->FrontendHost, sizeof(Console->FrontendHost));
+    Console->FrontendHost.State = ConsoleFrontendDetached;
+}
 
 static NTSTATUS NTAPI
 ConSrvTermInitTerminal(IN OUT PTERMINAL This,
                        IN PCONSOLE Console)
 {
     NTSTATUS Status;
-    PFRONTEND FrontEnd = This->Context;
+    PFRONTEND LoadedFrontEnd = This->Context;
     PCONSRV_CONSOLE ConSrvConsole = (PCONSRV_CONSOLE)Console;
+    PFRONTEND HostedFrontEnd;
 
-    /* Initialize the console pointer for our frontend */
-    FrontEnd->Console = ConSrvConsole;
+    if (LoadedFrontEnd == NULL)
+        return STATUS_INVALID_PARAMETER;
 
-    /** HACK HACK!! Copy FrontEnd into the console!! **/
-    DPRINT("Using FrontEndIFace HACK(1), should be removed after proper implementation!\n");
-    ConSrvConsole->FrontEndIFace = *FrontEnd;
+    ASSERT(Console->State == CONSOLE_INITIALIZING ||
+           Console->State == CONSOLE_RUNNING);
 
-    Status = FrontEnd->Vtbl->InitFrontEnd(FrontEnd, ConSrvConsole);
+    ConSrvResetFrontEndHost(ConSrvConsole);
+    HostedFrontEnd = &ConSrvConsole->FrontendHost.FrontEnd;
+    *HostedFrontEnd = *LoadedFrontEnd;
+    HostedFrontEnd->Console = ConSrvConsole;
+
+    ConSrvSetFrontEndState(ConSrvConsole, ConsoleFrontendLoaded);
+    ConSrvSetFrontEndState(ConSrvConsole, ConsoleFrontendAttached);
+
+    Status = HostedFrontEnd->Vtbl->InitFrontEnd(HostedFrontEnd, ConSrvConsole);
     if (!NT_SUCCESS(Status))
+    {
         DPRINT1("InitFrontEnd failed, Status = 0x%08lx\n", Status);
+        ConSrvResetFrontEndHost(ConSrvConsole);
+        return Status;
+    }
 
-    /** HACK HACK!! Be sure FrontEndIFace is correctly updated in the console!! **/
-    DPRINT("Using FrontEndIFace HACK(2), should be removed after proper implementation!\n");
-    ConSrvConsole->FrontEndIFace = *FrontEnd;
+    This->Console = Console;
+    This->Context = HostedFrontEnd;
+    ConsoleFreeHeap(LoadedFrontEnd);
 
-    return Status;
+    ConSrvSetFrontEndState(ConSrvConsole, ConsoleFrontendReady);
+    return STATUS_SUCCESS;
 }
 
 static VOID NTAPI
 ConSrvTermDeinitTerminal(IN OUT PTERMINAL This)
 {
     PFRONTEND FrontEnd = This->Context;
-    FrontEnd->Vtbl->DeinitFrontEnd(FrontEnd);
-}
+    PCONSRV_CONSOLE Console;
 
+    if (FrontEnd == NULL || This->Console == NULL)
+        return;
+
+    Console = (PCONSRV_CONSOLE)This->Console;
+    ASSERT(FrontEnd == &Console->FrontendHost.FrontEnd);
+    ASSERT(Console->State == CONSOLE_TERMINATING ||
+           Console->State == CONSOLE_IN_DESTRUCTION ||
+           Console->State == CONSOLE_RUNNING);
+
+    ConSrvSetFrontEndState(Console, ConsoleFrontendShuttingDown);
+    FrontEnd->Vtbl->DeinitFrontEnd(FrontEnd);
+    ConSrvResetFrontEndHost(Console);
+}
 
 
 /************ Line discipline ***************/
@@ -325,41 +381,41 @@ ConSrvTermReadStream(IN OUT PTERMINAL This,
     {
         /* COOKED mode, call the line discipline */
 
-        if (Console->LineBuffer == NULL)
+        if (Console->LineDiscipline.Buffer == NULL)
         {
             /* Start a new line */
-            Console->LineMaxSize = max(256, NumCharsToRead);
+            Console->LineDiscipline.MaxSize = max(256, NumCharsToRead);
 
             /*
              * Fixup ReadControl->nInitialChars in case the number of initial
              * characters is bigger than the number of characters to be read.
-             * It will always be, lesser than or equal to Console->LineMaxSize.
+             * It will always be, lesser than or equal to Console->LineDiscipline.MaxSize.
              */
             ReadControl->nInitialChars = min(ReadControl->nInitialChars, NumCharsToRead);
 
-            Console->LineBuffer = ConsoleAllocHeap(0, Console->LineMaxSize * sizeof(WCHAR));
-            if (Console->LineBuffer == NULL) return STATUS_NO_MEMORY;
+            Console->LineDiscipline.Buffer = ConsoleAllocHeap(0, Console->LineDiscipline.MaxSize * sizeof(WCHAR));
+            if (Console->LineDiscipline.Buffer == NULL) return STATUS_NO_MEMORY;
 
-            Console->LinePos = Console->LineSize = ReadControl->nInitialChars;
-            Console->LineComplete = Console->LineUpPressed = FALSE;
-            Console->LineInsertToggle = Console->InsertMode;
-            Console->LineWakeupMask = ReadControl->dwCtrlWakeupMask;
+            Console->LineDiscipline.Position = Console->LineDiscipline.Size = ReadControl->nInitialChars;
+            Console->LineDiscipline.Complete = Console->LineDiscipline.HistoryNavigating = FALSE;
+            Console->LineDiscipline.InsertToggle = Console->LineDiscipline.InsertMode;
+            Console->LineDiscipline.WakeupMask = ReadControl->dwCtrlWakeupMask;
 
             /*
              * Pre-fill the buffer with the nInitialChars from the user buffer.
              * Since pre-filling is only allowed in Unicode, we don't need to
              * worry about ANSI <-> Unicode conversion.
              */
-            memcpy(Console->LineBuffer, Buffer, Console->LineSize * sizeof(WCHAR));
-            if (Console->LineSize >= Console->LineMaxSize)
+            memcpy(Console->LineDiscipline.Buffer, Buffer, Console->LineDiscipline.Size * sizeof(WCHAR));
+            if (Console->LineDiscipline.Size >= Console->LineDiscipline.MaxSize)
             {
-                Console->LineComplete = TRUE;
-                Console->LinePos = 0;
+                Console->LineDiscipline.Complete = TRUE;
+                Console->LineDiscipline.Position = 0;
             }
         }
 
         /* If we don't have a complete line yet, process the pending input */
-        while (!Console->LineComplete && !IsListEmpty(&InputBuffer->InputEvents))
+        while (!Console->LineDiscipline.Complete && !IsListEmpty(&InputBuffer->InputEvents))
         {
             /* Remove an input event from the queue */
             _InterlockedDecrement((PLONG)&InputBuffer->NumberOfEvents);
@@ -382,18 +438,18 @@ ConSrvTermReadStream(IN OUT PTERMINAL This,
         }
 
         /* Check if we have a complete line to read from */
-        if (Console->LineComplete)
+        if (Console->LineDiscipline.Complete)
         {
             /*
-             * Console->LinePos keeps the next position of the character to read
+             * Console->LineDiscipline.Position keeps the next position of the character to read
              * in the line buffer across the different calls of the function,
              * so that the line buffer can be read by chunks after all the input
              * has been buffered.
              */
 
-            while (i < NumCharsToRead && Console->LinePos < Console->LineSize)
+            while (i < NumCharsToRead && Console->LineDiscipline.Position < Console->LineDiscipline.Size)
             {
-                WCHAR Char = Console->LineBuffer[Console->LinePos++];
+                WCHAR Char = Console->LineDiscipline.Buffer[Console->LineDiscipline.Position++];
 
                 if (Unicode)
                 {
@@ -406,14 +462,14 @@ ConSrvTermReadStream(IN OUT PTERMINAL This,
                 ++i;
             }
 
-            if (Console->LinePos >= Console->LineSize)
+            if (Console->LineDiscipline.Position >= Console->LineDiscipline.Size)
             {
                 /* The entire line has been read */
-                ConsoleFreeHeap(Console->LineBuffer);
-                Console->LineBuffer = NULL;
-                Console->LinePos = Console->LineMaxSize = Console->LineSize = 0;
-                // Console->LineComplete = Console->LineUpPressed = FALSE;
-                Console->LineComplete = FALSE;
+                ConsoleFreeHeap(Console->LineDiscipline.Buffer);
+                Console->LineDiscipline.Buffer = NULL;
+                Console->LineDiscipline.Position = Console->LineDiscipline.MaxSize = Console->LineDiscipline.Size = 0;
+                // Console->LineDiscipline.Complete = Console->LineDiscipline.HistoryNavigating = FALSE;
+                Console->LineDiscipline.Complete = FALSE;
             }
 
             Status = STATUS_SUCCESS;
@@ -868,7 +924,7 @@ ConioDrawConsole(PCONSRV_CONSOLE Console)
                   ActiveBuffer->ViewSize.Y - 1,
                   ActiveBuffer->ViewSize.X - 1);
     TermDrawRegion(Console, &Region);
-    // Console->FrontEndIFace.Vtbl->DrawRegion(&Console->FrontEndIFace, &Region);
+    // Console->FrontendHost.FrontEnd.Vtbl->DrawRegion(&Console->FrontendHost.FrontEnd, &Region);
 }
 
 static VOID NTAPI
@@ -983,8 +1039,8 @@ ResetFrontEnd(IN PCONSOLE Console)
     if (!Console) return;
 
     /* Reinitialize the frontend interface */
-    RtlZeroMemory(&ConSrvConsole->FrontEndIFace, sizeof(ConSrvConsole->FrontEndIFace));
-    ConSrvConsole->FrontEndIFace.Vtbl = &ConSrvTermVtbl;
+    RtlZeroMemory(&ConSrvConsole->FrontendHost.FrontEnd, sizeof(ConSrvConsole->FrontendHost.FrontEnd));
+    ConSrvConsole->FrontendHost.FrontEnd.Vtbl = &ConSrvTermVtbl;
 }
 #endif
 

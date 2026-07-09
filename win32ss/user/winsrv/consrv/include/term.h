@@ -44,26 +44,26 @@
 /* Macros used to call functions in the FRONTEND_VTBL virtual table */
 
 #define TermRefreshInternalInfo(Console) \
-    (Console)->FrontEndIFace.Vtbl->RefreshInternalInfo(&(Console)->FrontEndIFace)
+    (Console)->FrontendHost.FrontEnd.Vtbl->RefreshInternalInfo(&(Console)->FrontendHost.FrontEnd)
 #define TermChangeTitle(Console) \
-    (Console)->FrontEndIFace.Vtbl->ChangeTitle(&(Console)->FrontEndIFace)
+    (Console)->FrontendHost.FrontEnd.Vtbl->ChangeTitle(&(Console)->FrontendHost.FrontEnd)
 #define TermChangeIcon(Console, IconHandle) \
-    (Console)->FrontEndIFace.Vtbl->ChangeIcon(&(Console)->FrontEndIFace, (IconHandle))
+    (Console)->FrontendHost.FrontEnd.Vtbl->ChangeIcon(&(Console)->FrontendHost.FrontEnd, (IconHandle))
 #define TermGetThreadConsoleDesktop(Console) \
-    (Console)->FrontEndIFace.Vtbl->GetThreadConsoleDesktop(&(Console)->FrontEndIFace)
+    (Console)->FrontendHost.FrontEnd.Vtbl->GetThreadConsoleDesktop(&(Console)->FrontendHost.FrontEnd)
 #define TermGetConsoleWindowHandle(Console) \
-    (Console)->FrontEndIFace.Vtbl->GetConsoleWindowHandle(&(Console)->FrontEndIFace)
+    (Console)->FrontendHost.FrontEnd.Vtbl->GetConsoleWindowHandle(&(Console)->FrontendHost.FrontEnd)
 #define TermGetSelectionInfo(Console, pSelectionInfo) \
-    (Console)->FrontEndIFace.Vtbl->GetSelectionInfo(&(Console)->FrontEndIFace, (pSelectionInfo))
+    (Console)->FrontendHost.FrontEnd.Vtbl->GetSelectionInfo(&(Console)->FrontendHost.FrontEnd, (pSelectionInfo))
 #define TermGetDisplayMode(Console) \
-    (Console)->FrontEndIFace.Vtbl->GetDisplayMode(&(Console)->FrontEndIFace)
+    (Console)->FrontendHost.FrontEnd.Vtbl->GetDisplayMode(&(Console)->FrontendHost.FrontEnd)
 #define TermSetDisplayMode(Console, NewMode) \
-    (Console)->FrontEndIFace.Vtbl->SetDisplayMode(&(Console)->FrontEndIFace, (NewMode))
+    (Console)->FrontendHost.FrontEnd.Vtbl->SetDisplayMode(&(Console)->FrontendHost.FrontEnd, (NewMode))
 #define TermSetMouseCursor(Console, CursorHandle) \
-    (Console)->FrontEndIFace.Vtbl->SetMouseCursor(&(Console)->FrontEndIFace, (CursorHandle))
+    (Console)->FrontendHost.FrontEnd.Vtbl->SetMouseCursor(&(Console)->FrontendHost.FrontEnd, (CursorHandle))
 #define TermMenuControl(Console, CmdIdLow, CmdIdHigh) \
-    (Console)->FrontEndIFace.Vtbl->MenuControl(&(Console)->FrontEndIFace, (CmdIdLow), (CmdIdHigh))
+    (Console)->FrontendHost.FrontEnd.Vtbl->MenuControl(&(Console)->FrontendHost.FrontEnd, (CmdIdLow), (CmdIdHigh))
 #define TermSetMenuClose(Console, Enable) \
-    (Console)->FrontEndIFace.Vtbl->SetMenuClose(&(Console)->FrontEndIFace, (Enable))
+    (Console)->FrontendHost.FrontEnd.Vtbl->SetMenuClose(&(Console)->FrontendHost.FrontEnd, (Enable))
 
 /* EOF */

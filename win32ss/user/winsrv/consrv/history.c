@@ -191,8 +191,8 @@ HistoryAddEntry(PCONSRV_CONSOLE Console,
 
     if (!Hist) return;
 
-    // NewEntry.Length = NewEntry.MaximumLength = Console->LineSize * sizeof(WCHAR);
-    // NewEntry.Buffer = Console->LineBuffer;
+    // NewEntry.Length = NewEntry.MaximumLength = Console->LineDiscipline.Size * sizeof(WCHAR);
+    // NewEntry.Buffer = Console->LineDiscipline.Buffer;
 
     /* Don't add blank or duplicate entries */
     if (Entry->Length == 0 || Hist->MaxEntries == 0 ||
@@ -285,12 +285,12 @@ HistoryFindEntryByPrefix(PCONSRV_CONSOLE Console,
      * Like Up/F5, on first time start from current (usually last) entry,
      * but on subsequent times start at previous entry.
      */
-    if (Console->LineUpPressed)
+    if (Console->LineDiscipline.HistoryNavigating)
         Hist->Position = (Hist->Position ? Hist->Position : Hist->NumEntries) - 1;
-    Console->LineUpPressed = TRUE;
+    Console->LineDiscipline.HistoryNavigating = TRUE;
 
-    // Entry.Length = Console->LinePos * sizeof(WCHAR); // == Pos * sizeof(WCHAR)
-    // Entry.Buffer = Console->LineBuffer;
+    // Entry.Length = Console->LineDiscipline.Position * sizeof(WCHAR); // == Pos * sizeof(WCHAR)
+    // Entry.Buffer = Console->LineDiscipline.Buffer;
 
     /*
      * Keep going backwards, even wrapping around to the end,
@@ -649,7 +649,7 @@ CON_API(SrvSetConsoleCommandHistoryMode,
     DPRINT("SrvSetConsoleCommandHistoryMode(Mode = %d) is not yet implemented\n",
             SetHistoryModeRequest->Mode);
 
-    Console->InsertMode = !!(SetHistoryModeRequest->Mode & CONSOLE_OVERSTRIKE);
+    Console->LineDiscipline.InsertMode = !!(SetHistoryModeRequest->Mode & CONSOLE_OVERSTRIKE);
     return STATUS_SUCCESS;
 }
 

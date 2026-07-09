@@ -4,7 +4,7 @@
  * FILE:            win32ss/user/winsrv/consrv/include/conio_winsrv.h
  * PURPOSE:         Public Console I/O Interface - Offers wrap-up structures
  *                  over the console objects exposed by the console driver.
- * PROGRAMMERS:     Gé van Geldorp
+ * PROGRAMMERS:     Ge van Geldorp
  *                  Jeffrey Morlan
  *                  Hermes Belusca-Maito (hermes.belusca@sfr.fr)
  */
@@ -105,6 +105,35 @@ struct _FRONTEND
     PVOID Context2;             /* Private context */
 };
 
+
+typedef enum _CONSOLE_FRONTEND_STATE
+{
+    ConsoleFrontendDetached = 0,
+    ConsoleFrontendLoaded,
+    ConsoleFrontendAttached,
+    ConsoleFrontendReady,
+    ConsoleFrontendShuttingDown
+} CONSOLE_FRONTEND_STATE, *PCONSOLE_FRONTEND_STATE;
+
+typedef struct _CONSOLE_FRONTEND_HOST
+{
+    FRONTEND FrontEnd;
+    CONSOLE_FRONTEND_STATE State;
+} CONSOLE_FRONTEND_HOST, *PCONSOLE_FRONTEND_HOST;
+
+typedef struct _CONSOLE_LINE_DISCIPLINE
+{
+    PWCHAR Buffer;
+    ULONG MaxSize;
+    ULONG Size;
+    ULONG Position;
+    BOOLEAN Complete;
+    BOOLEAN HistoryNavigating;
+    BOOLEAN InsertToggle;
+    ULONG WakeupMask;
+    BOOLEAN InsertMode;
+    BOOLEAN QuickEdit;
+} CONSOLE_LINE_DISCIPLINE, *PCONSOLE_LINE_DISCIPLINE;
 /* PauseFlags values (internal only) */
 #define PAUSED_FROM_KEYBOARD  0x1
 #define PAUSED_FROM_SCROLLBAR 0x2
@@ -127,7 +156,7 @@ typedef struct _CONSRV_CONSOLE
 
     HANDLE InitEvents[MAX_INIT_EVENTS];         /* Initialization events */
 
-    FRONTEND FrontEndIFace;                     /* Frontend-specific interface */
+    CONSOLE_FRONTEND_HOST FrontendHost;         /* Frontend host owned by the console */
 
 /******************************* Process support ******************************/
     LIST_ENTRY ProcessList;         /* List of processes owning the console. The first one is the so-called "Console Leader Process" */
@@ -149,17 +178,7 @@ typedef struct _CONSRV_CONSOLE
     BOOLEAN HistoryNoDup;                   /* Remove old duplicate history entries */
 
 /**************************** Input Line Discipline ***************************/
-    PWCHAR  LineBuffer;                     /* Current line being input, in line buffered mode */
-    ULONG   LineMaxSize;                    /* Maximum size of line in characters (including CR+LF) */
-    ULONG   LineSize;                       /* Current size of line */
-    ULONG   LinePos;                        /* Current position within line */
-    BOOLEAN LineComplete;                   /* User pressed enter, ready to send back to client */
-    BOOLEAN LineUpPressed;
-    BOOLEAN LineInsertToggle;               /* Replace character over cursor instead of inserting */
-    ULONG   LineWakeupMask;                 /* Bitmap of which control characters will end line input */
-
-    BOOLEAN InsertMode;
-    BOOLEAN QuickEdit;
+    CONSOLE_LINE_DISCIPLINE LineDiscipline; /* Line input state owned by the console */
 
 /************************ Virtual DOS Machine support *************************/
     COORD   VDMBufferSize;             /* Real size of the VDM buffer, in units of ??? */

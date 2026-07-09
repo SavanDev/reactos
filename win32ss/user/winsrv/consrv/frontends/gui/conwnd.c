@@ -1658,7 +1658,7 @@ OnMouse(PGUI_CONSOLE_DATA GuiData, UINT msg, WPARAM wParam, LPARAM lParam)
     }
 
     if ( (GuiData->Selection.dwFlags & CONSOLE_SELECTION_IN_PROGRESS) ||
-         (Console->QuickEdit) )
+         (Console->LineDiscipline.QuickEdit) )
     {
         switch (msg)
         {
