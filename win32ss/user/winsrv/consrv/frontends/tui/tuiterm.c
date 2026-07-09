@@ -750,7 +750,7 @@ TuiInitFrontEnd(IN OUT PFRONTEND This,
         DPRINT1("CONSRV: Failed to create TUI_CONSOLE_DATA\n");
         return STATUS_UNSUCCESSFUL;
     }
-    // Console->FrontEndIFace.Context = (PVOID)TuiData;
+    // Console->FrontendHost.FrontEnd.Context = (PVOID)TuiData;
     TuiData->Console      = Console;
     TuiData->ActiveBuffer = Console->ActiveBuffer;
     TuiData->hWindow = NULL;

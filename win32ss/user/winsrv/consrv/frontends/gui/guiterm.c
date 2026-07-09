@@ -497,7 +497,7 @@ GuiInitFrontEnd(IN OUT PFRONTEND This,
         DPRINT1("CONSRV: Failed to create GUI_CONSOLE_DATA\n");
         return STATUS_UNSUCCESSFUL;
     }
-    /// /* HACK */ Console->FrontEndIFace.Context = (PVOID)GuiData; /* HACK */
+    /// /* HACK */ Console->FrontendHost.FrontEnd.Context = (PVOID)GuiData; /* HACK */
     GuiData->Console      = Console;
     GuiData->ActiveBuffer = Console->ActiveBuffer;
     GuiData->hWindow = NULL;

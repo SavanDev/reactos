@@ -217,11 +217,11 @@ ConioProcessInputEvent(PCONSRV_CONSOLE Console,
             DPRINT1("Console_Api Ctrl-C\n");
             ConSrvConsoleProcessCtrlEvent(Console, 0, CTRL_C_EVENT);
 
-            if (Console->LineBuffer && !Console->LineComplete)
+            if (Console->LineDiscipline.Buffer && !Console->LineDiscipline.Complete)
             {
                 /* Line input is in progress; end it */
-                Console->LinePos = Console->LineSize = 0;
-                Console->LineComplete = TRUE;
+                Console->LineDiscipline.Position = Console->LineDiscipline.Size = 0;
+                Console->LineDiscipline.Complete = TRUE;
             }
             return STATUS_SUCCESS; // STATUS_CONTROL_C_EXIT;
         }

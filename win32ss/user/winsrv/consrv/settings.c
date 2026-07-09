@@ -44,8 +44,8 @@ ConSrvApplyUserSettings(
      * - QuickEdit and Insert modes,
      * - History settings.
      */
-    Console->QuickEdit  = !!ConsoleInfo->QuickEdit;
-    Console->InsertMode = !!ConsoleInfo->InsertMode;
+    Console->LineDiscipline.QuickEdit  = !!ConsoleInfo->QuickEdit;
+    Console->LineDiscipline.InsertMode = !!ConsoleInfo->InsertMode;
     /// Console->InputBufferSize = 0;
     HistoryReshapeAllBuffers(Console,
                              ConsoleInfo->HistoryBufferSize,

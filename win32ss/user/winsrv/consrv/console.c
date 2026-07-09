@@ -742,16 +742,15 @@ ConSrvInitConsole(OUT PHANDLE NewConsoleHandle,
     Console->HistoryBufferSize = ConsoleInfo->HistoryBufferSize;
     Console->HistoryNoDup      = ConsoleInfo->HistoryNoDup;
 
-    /* Initialize the Input Line Discipline */
-    // InitLineInput(Console);
-    Console->LineBuffer = NULL;
-    Console->LinePos = Console->LineMaxSize = Console->LineSize = 0;
-    Console->LineComplete = Console->LineUpPressed = FALSE;
-    // LineWakeupMask
-    Console->LineInsertToggle =
-    Console->InsertMode = ConsoleInfo->InsertMode;
-    Console->QuickEdit  = ConsoleInfo->QuickEdit;
-
+    /* Initialize the frontend host and the input line discipline */
+    Console->FrontendHost.State = ConsoleFrontendDetached;
+    Console->LineDiscipline.Buffer = NULL;
+    Console->LineDiscipline.Position = Console->LineDiscipline.MaxSize = Console->LineDiscipline.Size = 0;
+    Console->LineDiscipline.Complete = Console->LineDiscipline.HistoryNavigating = FALSE;
+    Console->LineDiscipline.WakeupMask = 0;
+    Console->LineDiscipline.InsertToggle =
+    Console->LineDiscipline.InsertMode = ConsoleInfo->InsertMode;
+    Console->LineDiscipline.QuickEdit  = ConsoleInfo->QuickEdit;
     /* Popup windows */
     InitializeListHead(&Console->PopupWindows);
 
@@ -836,7 +835,7 @@ ConSrvDeleteConsole(PCONSRV_CONSOLE Console)
     NtClose(Console->InitEvents[INIT_SUCCESS]);
 
     /* Clean the Input Line Discipline */
-    if (Console->LineBuffer) ConsoleFreeHeap(Console->LineBuffer);
+    if (Console->LineDiscipline.Buffer) ConsoleFreeHeap(Console->LineDiscipline.Buffer);
 
     /* Clean aliases and history */
     IntDeleteAllAliases(Console);
@@ -1682,13 +1681,13 @@ CON_API(SrvGetConsoleMode,
          */
         if (INPUT_BUFFER == Object->Type)
         {
-            if (Console->InsertMode || Console->QuickEdit)
+            if (Console->LineDiscipline.InsertMode || Console->LineDiscipline.QuickEdit)
             {
                 /* Windows also adds ENABLE_EXTENDED_FLAGS, even if it's not documented on MSDN */
                 *ConsoleMode |= ENABLE_EXTENDED_FLAGS;
 
-                if (Console->InsertMode) *ConsoleMode |= ENABLE_INSERT_MODE;
-                if (Console->QuickEdit ) *ConsoleMode |= ENABLE_QUICK_EDIT_MODE;
+                if (Console->LineDiscipline.InsertMode) *ConsoleMode |= ENABLE_INSERT_MODE;
+                if (Console->LineDiscipline.QuickEdit ) *ConsoleMode |= ENABLE_QUICK_EDIT_MODE;
             }
         }
     }
@@ -1746,8 +1745,8 @@ CON_API(SrvSetConsoleMode,
                 }
                 else
                 {
-                    Console->InsertMode = !!(ConsoleMode & ENABLE_INSERT_MODE);
-                    Console->QuickEdit  = !!(ConsoleMode & ENABLE_QUICK_EDIT_MODE);
+                    Console->LineDiscipline.InsertMode = !!(ConsoleMode & ENABLE_INSERT_MODE);
+                    Console->LineDiscipline.QuickEdit  = !!(ConsoleMode & ENABLE_QUICK_EDIT_MODE);
                 }
             }
         }

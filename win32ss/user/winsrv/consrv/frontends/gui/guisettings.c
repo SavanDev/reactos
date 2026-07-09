@@ -132,8 +132,8 @@ GuiConsoleShowConsoleProperties(PGUI_CONSOLE_DATA GuiData,
         pSharedInfo->hWnd = GuiData->hWindow;
 
         /* Console information */
-        pSharedInfo->QuickEdit = Console->QuickEdit;
-        pSharedInfo->InsertMode = Console->InsertMode;
+        pSharedInfo->QuickEdit = Console->LineDiscipline.QuickEdit;
+        pSharedInfo->InsertMode = Console->LineDiscipline.InsertMode;
         pSharedInfo->NumberOfHistoryBuffers = Console->MaxNumberOfHistoryBuffers;
         pSharedInfo->HistoryBufferSize = Console->HistoryBufferSize;
         pSharedInfo->HistoryNoDup = Console->HistoryNoDup;

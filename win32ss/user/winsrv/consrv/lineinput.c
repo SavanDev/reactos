@@ -38,14 +38,14 @@ static VOID
 LineInputSetPos(PCONSRV_CONSOLE Console,
                 UINT Pos)
 {
-    if (Pos != Console->LinePos && (GetConsoleInputBufferMode(Console) & ENABLE_ECHO_INPUT))
+    if (Pos != Console->LineDiscipline.Position && (GetConsoleInputBufferMode(Console) & ENABLE_ECHO_INPUT))
     {
         PCONSOLE_SCREEN_BUFFER Buffer = Console->ActiveBuffer;
         SHORT OldCursorX = Buffer->CursorPosition.X;
         SHORT OldCursorY = Buffer->CursorPosition.Y;
         INT XY = OldCursorY * Buffer->ScreenBufferSize.X + OldCursorX;
 
-        XY += (Pos - Console->LinePos);
+        XY += (Pos - Console->LineDiscipline.Position);
         if (XY < 0)
             XY = 0;
         else if (XY >= Buffer->ScreenBufferSize.Y * Buffer->ScreenBufferSize.X)
@@ -56,7 +56,7 @@ LineInputSetPos(PCONSRV_CONSOLE Console,
         TermSetScreenInfo(Console, Buffer, OldCursorX, OldCursorY);
     }
 
-    Console->LinePos = Pos;
+    Console->LineDiscipline.Position = Pos;
 }
 
 static VOID
@@ -66,39 +66,39 @@ LineInputEdit(PCONSRV_CONSOLE Console,
               PWCHAR Insertion)
 {
     PTEXTMODE_SCREEN_BUFFER ActiveBuffer;
-    UINT Pos = Console->LinePos;
-    UINT NewSize = Console->LineSize - NumToDelete + NumToInsert;
+    UINT Pos = Console->LineDiscipline.Position;
+    UINT NewSize = Console->LineDiscipline.Size - NumToDelete + NumToInsert;
     UINT i;
 
     if (GetType(Console->ActiveBuffer) != TEXTMODE_BUFFER) return;
     ActiveBuffer = (PTEXTMODE_SCREEN_BUFFER)Console->ActiveBuffer;
 
     /* Make sure there is always enough room for ending \r\n */
-    if (NewSize + 2 > Console->LineMaxSize)
+    if (NewSize + 2 > Console->LineDiscipline.MaxSize)
         return;
 
-    memmove(&Console->LineBuffer[Pos + NumToInsert],
-            &Console->LineBuffer[Pos + NumToDelete],
-            (Console->LineSize - (Pos + NumToDelete)) * sizeof(WCHAR));
-    memcpy(&Console->LineBuffer[Pos], Insertion, NumToInsert * sizeof(WCHAR));
+    memmove(&Console->LineDiscipline.Buffer[Pos + NumToInsert],
+            &Console->LineDiscipline.Buffer[Pos + NumToDelete],
+            (Console->LineDiscipline.Size - (Pos + NumToDelete)) * sizeof(WCHAR));
+    memcpy(&Console->LineDiscipline.Buffer[Pos], Insertion, NumToInsert * sizeof(WCHAR));
 
     if (GetConsoleInputBufferMode(Console) & ENABLE_ECHO_INPUT)
     {
         if (Pos < NewSize)
         {
             TermWriteStream(Console, ActiveBuffer,
-                            &Console->LineBuffer[Pos],
+                            &Console->LineDiscipline.Buffer[Pos],
                             NewSize - Pos,
                             TRUE);
         }
-        for (i = NewSize; i < Console->LineSize; ++i)
+        for (i = NewSize; i < Console->LineDiscipline.Size; ++i)
         {
             TermWriteStream(Console, ActiveBuffer, L" ", 1, TRUE);
         }
-        Console->LinePos = i;
+        Console->LineDiscipline.Position = i;
     }
 
-    Console->LineSize = NewSize;
+    Console->LineDiscipline.Size = NewSize;
     LineInputSetPos(Console, Pos + NumToInsert);
 }
 
@@ -118,7 +118,7 @@ LineInputRecallHistory(PCONSRV_CONSOLE Console,
     Hist->Position = Position;
 
     LineInputSetPos(Console, 0);
-    LineInputEdit(Console, Console->LineSize,
+    LineInputEdit(Console, Console->LineDiscipline.Size,
                   Hist->Entries[Hist->Position].Length / sizeof(WCHAR),
                   Hist->Entries[Hist->Position].Buffer);
 
@@ -129,7 +129,7 @@ LineInputRecallHistory(PCONSRV_CONSOLE Console,
     if (!HistoryRecallHistory(Console, ExeName, Offset, &Entry)) return;
 
     LineInputSetPos(Console, 0);
-    LineInputEdit(Console, Console->LineSize,
+    LineInputEdit(Console, Console->LineDiscipline.Size,
                   Entry.Length / sizeof(WCHAR),
                   Entry.Buffer);
 #endif
@@ -148,7 +148,7 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
                  PUNICODE_STRING ExeName,
                  KEY_EVENT_RECORD *KeyEvent)
 {
-    UINT Pos = Console->LinePos;
+    UINT Pos = Console->LineDiscipline.Position;
     UNICODE_STRING Entry;
 
     /*
@@ -161,7 +161,7 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
         {
             /* Clear the entire line */
             LineInputSetPos(Console, 0);
-            LineInputEdit(Console, Console->LineSize, 0, NULL);
+            LineInputEdit(Console, Console->LineDiscipline.Size, 0, NULL);
 
             // TESTS!!
             if (Popup)
@@ -185,9 +185,9 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
         {
             /* Move to end of line. With CTRL, erase everything right of cursor. */
             if (KeyEvent->dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
-                LineInputEdit(Console, Console->LineSize - Pos, 0, NULL);
+                LineInputEdit(Console, Console->LineDiscipline.Size - Pos, 0, NULL);
             else
-                LineInputSetPos(Console, Console->LineSize);
+                LineInputSetPos(Console, Console->LineDiscipline.Size);
             return;
         }
 
@@ -196,8 +196,8 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
             /* Move to the left. With CTRL, move to beginning of previous word. */
             if (KeyEvent->dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
             {
-                while (Pos > 0 && Console->LineBuffer[Pos - 1] == L' ') Pos--;
-                while (Pos > 0 && Console->LineBuffer[Pos - 1] != L' ') Pos--;
+                while (Pos > 0 && Console->LineDiscipline.Buffer[Pos - 1] == L' ') Pos--;
+                while (Pos > 0 && Console->LineDiscipline.Buffer[Pos - 1] != L' ') Pos--;
             }
             else
             {
@@ -213,15 +213,15 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
             /* Move to the right. With CTRL, move to beginning of next word. */
             if (KeyEvent->dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
             {
-                while (Pos < Console->LineSize && Console->LineBuffer[Pos] != L' ') Pos++;
-                while (Pos < Console->LineSize && Console->LineBuffer[Pos] == L' ') Pos++;
+                while (Pos < Console->LineDiscipline.Size && Console->LineDiscipline.Buffer[Pos] != L' ') Pos++;
+                while (Pos < Console->LineDiscipline.Size && Console->LineDiscipline.Buffer[Pos] == L' ') Pos++;
                 LineInputSetPos(Console, Pos);
             }
             else
             {
                 /* Recall one character (but don't overwrite current line) */
                 HistoryGetCurrentEntry(Console, ExeName, &Entry);
-                if (Pos < Console->LineSize)
+                if (Pos < Console->LineDiscipline.Size)
                     LineInputSetPos(Console, Pos + 1);
                 else if (Pos * sizeof(WCHAR) < Entry.Length)
                     LineInputEdit(Console, 0, 1, &Entry.Buffer[Pos]);
@@ -232,7 +232,7 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
         case VK_INSERT:
         {
             /* Toggle between insert and overstrike */
-            Console->LineInsertToggle = !Console->LineInsertToggle;
+            Console->LineDiscipline.InsertToggle = !Console->LineDiscipline.InsertToggle;
             TermSetCursorInfo(Console, Console->ActiveBuffer);
             return;
         }
@@ -240,7 +240,7 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
         case VK_DELETE:
         {
             /* Remove one character to right of cursor */
-            if (Pos != Console->LineSize)
+            if (Pos != Console->LineDiscipline.Size)
                 LineInputEdit(Console, 1, 0, NULL);
             return;
         }
@@ -266,8 +266,8 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
              * Recall the previous history entry. On first time, actually recall
              * the current (usually last) entry; on subsequent times go back.
              */
-            LineInputRecallHistory(Console, ExeName, Console->LineUpPressed ? -1 : 0);
-            Console->LineUpPressed = TRUE;
+            LineInputRecallHistory(Console, ExeName, Console->LineDiscipline.HistoryNavigating ? -1 : 0);
+            Console->LineDiscipline.HistoryNavigating = TRUE;
             return;
         }
 
@@ -285,7 +285,7 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
             if (Pos * sizeof(WCHAR) < Entry.Length)
             {
                 UINT InsertSize = (Entry.Length / sizeof(WCHAR) - Pos);
-                UINT DeleteSize = min(Console->LineSize - Pos, InsertSize);
+                UINT DeleteSize = min(Console->LineDiscipline.Size - Pos, InsertSize);
                 LineInputEdit(Console, DeleteSize, InsertSize, &Entry.Buffer[Pos]);
             }
             return;
@@ -316,12 +316,12 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
         {
             UNICODE_STRING EntryFound;
 
-            Entry.Length = Console->LinePos * sizeof(WCHAR); // == Pos * sizeof(WCHAR)
-            Entry.Buffer = Console->LineBuffer;
+            Entry.Length = Console->LineDiscipline.Position * sizeof(WCHAR); // == Pos * sizeof(WCHAR)
+            Entry.Buffer = Console->LineDiscipline.Buffer;
 
             if (HistoryFindEntryByPrefix(Console, ExeName, &Entry, &EntryFound))
             {
-                LineInputEdit(Console, Console->LineSize - Pos,
+                LineInputEdit(Console, Console->LineDiscipline.Size - Pos,
                               EntryFound.Length / sizeof(WCHAR) - Pos,
                               &EntryFound.Buffer[Pos]);
                 /* Cursor stays where it was */
@@ -343,12 +343,12 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
              * Like Up/F5, on first time start from current (usually last) entry,
              * but on subsequent times start at previous entry.
              */
-            if (Console->LineUpPressed)
+            if (Console->LineDiscipline.HistoryNavigating)
                 Hist->Position = (Hist->Position ? Hist->Position : Hist->NumEntries) - 1;
-            Console->LineUpPressed = TRUE;
+            Console->LineDiscipline.HistoryNavigating = TRUE;
 
-            Entry.Length = Console->LinePos * sizeof(WCHAR); // == Pos * sizeof(WCHAR)
-            Entry.Buffer = Console->LineBuffer;
+            Entry.Length = Console->LineDiscipline.Position * sizeof(WCHAR); // == Pos * sizeof(WCHAR)
+            Entry.Buffer = Console->LineDiscipline.Buffer;
 
             /*
              * Keep going backwards, even wrapping around to the end,
@@ -360,7 +360,7 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
                 if (RtlPrefixUnicodeString(&Entry, &Hist->Entries[HistPos], FALSE))
                 {
                     Hist->Position = HistPos;
-                    LineInputEdit(Console, Console->LineSize - Pos,
+                    LineInputEdit(Console, Console->LineDiscipline.Size - Pos,
                                   Hist->Entries[HistPos].Length / sizeof(WCHAR) - Pos,
                                   &Hist->Entries[HistPos].Buffer[Pos]);
                     /* Cursor stays where it was */
@@ -404,16 +404,16 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
          */
         if (GetConsoleInputBufferMode(Console) & ENABLE_ECHO_INPUT)
         {
-            Entry.Length = Entry.MaximumLength = Console->LineSize * sizeof(WCHAR);
-            Entry.Buffer = Console->LineBuffer;
+            Entry.Length = Entry.MaximumLength = Console->LineDiscipline.Size * sizeof(WCHAR);
+            Entry.Buffer = Console->LineDiscipline.Buffer;
             HistoryAddEntry(Console, ExeName, &Entry);
         }
 
         /* TODO: Expand aliases */
         DPRINT1("TODO: Expand aliases\n");
 
-        LineInputSetPos(Console, Console->LineSize);
-        Console->LineBuffer[Console->LineSize++] = L'\r';
+        LineInputSetPos(Console, Console->LineDiscipline.Size);
+        Console->LineDiscipline.Buffer[Console->LineDiscipline.Size++] = L'\r';
         if ((GetType(Console->ActiveBuffer) == TEXTMODE_BUFFER) &&
             (GetConsoleInputBufferMode(Console) & ENABLE_ECHO_INPUT))
         {
@@ -426,33 +426,33 @@ LineInputKeyDown(PCONSRV_CONSOLE Console,
          * pre-filled with LineMaxSize - 1 characters.
          */
         if ((GetConsoleInputBufferMode(Console) & ENABLE_PROCESSED_INPUT) &&
-            Console->LineSize < Console->LineMaxSize)
+            Console->LineDiscipline.Size < Console->LineDiscipline.MaxSize)
         {
-            Console->LineBuffer[Console->LineSize++] = L'\n';
+            Console->LineDiscipline.Buffer[Console->LineDiscipline.Size++] = L'\n';
             if ((GetType(Console->ActiveBuffer) == TEXTMODE_BUFFER) &&
                 (GetConsoleInputBufferMode(Console) & ENABLE_ECHO_INPUT))
             {
                 TermWriteStream(Console, (PTEXTMODE_SCREEN_BUFFER)(Console->ActiveBuffer), L"\n", 1, TRUE);
             }
         }
-        Console->LineComplete = TRUE;
-        Console->LinePos = 0;
+        Console->LineDiscipline.Complete = TRUE;
+        Console->LineDiscipline.Position = 0;
     }
     else if (KeyEvent->uChar.UnicodeChar != L'\0')
     {
         if (KeyEvent->uChar.UnicodeChar < 0x20 &&
-            Console->LineWakeupMask & (1 << KeyEvent->uChar.UnicodeChar))
+            Console->LineDiscipline.WakeupMask & (1 << KeyEvent->uChar.UnicodeChar))
         {
             /* Control key client wants to handle itself (e.g. for tab completion) */
-            Console->LineBuffer[Console->LineSize++] = L' ';
-            Console->LineBuffer[Console->LinePos] = KeyEvent->uChar.UnicodeChar;
-            Console->LineComplete = TRUE;
-            Console->LinePos = 0;
+            Console->LineDiscipline.Buffer[Console->LineDiscipline.Size++] = L' ';
+            Console->LineDiscipline.Buffer[Console->LineDiscipline.Position] = KeyEvent->uChar.UnicodeChar;
+            Console->LineDiscipline.Complete = TRUE;
+            Console->LineDiscipline.Position = 0;
         }
         else
         {
             /* Normal character */
-            BOOL Overstrike = !Console->LineInsertToggle && (Console->LinePos != Console->LineSize);
+            BOOL Overstrike = !Console->LineDiscipline.InsertToggle && (Console->LineDiscipline.Position != Console->LineDiscipline.Size);
             DPRINT("Overstrike = %s\n", Overstrike ? "true" : "false");
             LineInputEdit(Console, (Overstrike ? 1 : 0), 1, &KeyEvent->uChar.UnicodeChar);
         }
