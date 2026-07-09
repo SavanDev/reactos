@@ -213,5 +213,6 @@ public:
 
 private:
     HRESULT _KeyboardItemChange(DWORD change);
+    HRESULT _StartPanelColumnChange();
     HRESULT _CallCB(UINT uMsg, WPARAM wParam, LPARAM lParam, UINT id = 0, LPITEMIDLIST pidl = NULL);
 };

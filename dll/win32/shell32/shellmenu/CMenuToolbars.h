@@ -77,6 +77,9 @@ public:
 
     HRESULT KeyboardItemChange(DWORD changeType);
 
+    HRESULT GetHotItemCenterY(INT *pY);
+    HRESULT SelectItemNearestY(INT y);
+
     HRESULT PrepareExecuteItem(INT iItem);
     HRESULT ExecuteItem();
 

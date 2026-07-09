@@ -57,6 +57,7 @@ private:
     BOOL m_StartPanelTrackingMouse;
     WCHAR m_szLogOff[128];
     WCHAR m_szShutdown[128];
+    WCHAR m_szUserName[128];
 
     virtual void OnFinalMessage(HWND hWnd);
 public:

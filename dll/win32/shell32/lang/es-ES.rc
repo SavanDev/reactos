@@ -1007,6 +1007,9 @@ BEGIN
     IDS_EXE_DESCRIPTION "Descripción:"
 
     IDS_MENU_EMPTY "(Vacío)"
+    IDS_STARTPANEL_PIN "Anclar al menú Inicio"
+    IDS_STARTPANEL_UNPIN "Desanclar del menú Inicio"
+    IDS_STARTPANEL_REMOVEITEM "Quitar de esta lista"
     IDS_OBJECTS "%d elementos"
     IDS_OBJECTS_SELECTED "%d elementos seleccionados"
 

@@ -66,6 +66,41 @@ static BOOL GetMenuItemTextByCommand(HMENU hMenu, UINT uId, LPWSTR pszText, UINT
     return GetMenuItemInfoW(hMenu, uId, FALSE, &mii);
 }
 
+/* The XP start panel header shows the account's display name ("full name")
+ * when available; fall back to the plain login name otherwise. */
+typedef BOOLEAN (WINAPI *PFN_GETUSERNAMEEXW)(int NameFormat, LPWSTR lpNameBuffer, PULONG nSize);
+#define STARTPANEL_NAME_DISPLAY 3 /* EXTENDED_NAME_FORMAT::NameDisplay */
+
+static VOID GetStartPanelUserName(LPWSTR pszName, ULONG cchName)
+{
+    HMODULE hSecur32;
+    ULONG cch;
+
+    pszName[0] = UNICODE_NULL;
+
+    hSecur32 = LoadLibraryW(L"secur32.dll");
+    if (hSecur32)
+    {
+        PFN_GETUSERNAMEEXW pGetUserNameExW =
+            (PFN_GETUSERNAMEEXW)GetProcAddress(hSecur32, "GetUserNameExW");
+
+        cch = cchName;
+        if (pGetUserNameExW &&
+            pGetUserNameExW(STARTPANEL_NAME_DISPLAY, pszName, &cch) &&
+            pszName[0])
+        {
+            FreeLibrary(hSecur32);
+            return;
+        }
+
+        FreeLibrary(hSecur32);
+    }
+
+    cch = cchName;
+    if (!GetUserNameW(pszName, &cch))
+        pszName[0] = UNICODE_NULL;
+}
+
 static VOID SanitizeStartPanelButtonText(LPWSTR pszText)
 {
     LPWSTR pRead, pWrite;
@@ -103,6 +138,7 @@ CMenuDeskBar::CMenuDeskBar() :
     ZeroMemory(&m_StartPanelRects, sizeof(m_StartPanelRects));
     m_szLogOff[0] = UNICODE_NULL;
     m_szShutdown[0] = UNICODE_NULL;
+    m_szUserName[0] = UNICODE_NULL;
 }
 
 CMenuDeskBar::~CMenuDeskBar()
@@ -190,6 +226,9 @@ HRESULT CMenuDeskBar::_LoadStartPanelFooterStrings()
 {
     CComPtr<ITrayPriv> trayPriv;
     HMENU hMenu = NULL;
+
+    if (!m_szUserName[0])
+        GetStartPanelUserName(m_szUserName, _countof(m_szUserName));
 
     if (m_szLogOff[0] && m_szShutdown[0])
         return S_OK;
@@ -934,8 +973,8 @@ LRESULT CMenuDeskBar::_OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bH
     if (_IsStartPanelLayout())
     {
         const STARTPANELTHEME& Theme = GetStartPanelTheme();
-        WCHAR szUser[128];
         RECT rcHeader, rcText;
+        bHandled = TRUE;
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(&ps);
         HBRUSH hbrHeader = CreateSolidBrush(Theme.crHeaderDark);
@@ -946,7 +985,6 @@ LRESULT CMenuDeskBar::_OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bH
         HBRUSH hbrButtonEdge = CreateSolidBrush(Theme.crFooterButtonEdge);
         HFONT hFont = NULL, hFontOld;
         LOGFONTW lf;
-        DWORD cchUser = _countof(szUser);
         HFONT hFooterOld;
         HICON hIcon;
 
@@ -970,8 +1008,8 @@ LRESULT CMenuDeskBar::_OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bH
         rcLine.bottom = rcLine.top + 1;
         FillRect(hdc, &rcLine, hbrFooterLight);
 
-        if (!GetUserNameW(szUser, &cchUser))
-            szUser[0] = UNICODE_NULL;
+        if (!m_szUserName[0])
+            GetStartPanelUserName(m_szUserName, _countof(m_szUserName));
 
         if (GetObjectW(GetStockObject(DEFAULT_GUI_FONT), sizeof(lf), &lf) == sizeof(lf))
         {
@@ -983,7 +1021,7 @@ LRESULT CMenuDeskBar::_OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bH
         hFontOld = (HFONT)SelectObject(hdc, hFont ? hFont : GetStockObject(DEFAULT_GUI_FONT));
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, RGB(255, 255, 255));
-        DrawTextW(hdc, szUser, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        DrawTextW(hdc, m_szUserName, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         SelectObject(hdc, hFontOld);
 
         hIcon = (HICON)LoadImageW(shell32_hInstance, MAKEINTRESOURCEW(IDI_SHELL_USERS2), IMAGE_ICON,

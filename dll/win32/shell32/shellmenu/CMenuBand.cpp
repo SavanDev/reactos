@@ -1007,6 +1007,29 @@ HRESULT  CMenuBand::_KeyboardItemChange(DWORD change)
     return tb->KeyboardItemChange(change == VK_DOWN ? VK_HOME : VK_END);
 }
 
+/* In the start panel, left/right moves the selection to the item of the
+ * other column that is nearest vertically, wrapping around like Open-Shell
+ * does for multi-column menus. */
+HRESULT CMenuBand::_StartPanelColumnChange()
+{
+    CMenuToolbarBase *from = m_hotBar;
+    CMenuToolbarBase *to;
+    INT y;
+
+    if (!IsStartPanelLayout() || !m_staticToolbar || !m_SFToolbar)
+        return S_FALSE;
+
+    if (from == m_SFToolbar)
+        to = m_staticToolbar;
+    else
+        to = m_SFToolbar;
+
+    if (from && from->GetHotItemCenterY(&y) == S_OK)
+        return to->SelectItemNearestY(y);
+
+    return to->KeyboardItemChange(VK_HOME);
+}
+
 HRESULT CMenuBand::_MenuItemSelect(DWORD changeType)
 {
     // Needed to prevent the this point from vanishing mid-function
@@ -1021,8 +1044,9 @@ HRESULT CMenuBand::_MenuItemSelect(DWORD changeType)
         case VK_DOWN:
             return _KeyboardItemChange(changeType);
 
-            // TODO: Left/Right across multi-column menus, if they ever work.
         case VK_LEFT:
+            if (_StartPanelColumnChange() == S_OK)
+                return S_OK;
             changeType = MPOS_SELECTLEFT;
             break;
         case VK_RIGHT:
@@ -1076,6 +1100,8 @@ HRESULT CMenuBand::_MenuItemSelect(DWORD changeType)
     case MPOS_SELECTRIGHT:
         if (m_hotBar && m_hotItem >= 0 && m_hotBar->PopupItem(m_hotItem, TRUE) == S_OK)
             return S_FALSE;
+        if (_StartPanelColumnChange() == S_OK)
+            return S_OK;
         if (m_parentBand)
             return m_parentBand->_MenuItemSelect(VK_RIGHT);
         if (!m_subMenuParent)

@@ -1749,6 +1749,73 @@ HRESULT CMenuToolbarBase::KeyboardItemChange(DWORD dwSelectType)
     return S_FALSE;
 }
 
+HRESULT CMenuToolbarBase::GetHotItemCenterY(INT *pY)
+{
+    TBBUTTONINFO info = { 0 };
+    RECT rc;
+    POINT pt;
+    INT index;
+
+    *pY = 0;
+
+    if (m_hotItem < 0)
+        return S_FALSE;
+
+    info.cbSize = sizeof(info);
+    info.dwMask = 0;
+    index = GetButtonInfo(m_hotItem, &info);
+    if (index < 0 || !GetItemRect(index, &rc))
+        return S_FALSE;
+
+    pt.x = 0;
+    pt.y = (rc.top + rc.bottom) / 2;
+    ClientToScreen(&pt);
+    *pY = pt.y;
+    return S_OK;
+}
+
+HRESULT CMenuToolbarBase::SelectItemNearestY(INT y)
+{
+    INT count = GetButtonCount();
+    INT bestItem = -1;
+    INT bestDist = MAXLONG;
+
+    for (INT i = 0; i < count; ++i)
+    {
+        TBBUTTON btn = { 0 };
+        RECT rc;
+        POINT pt;
+        INT dist;
+
+        if (!GetButton(i, &btn))
+            continue;
+
+        // Separators and the "(Empty)" placeholder carry no item data
+        if (!btn.dwData || (btn.fsState & TBSTATE_HIDDEN) || (btn.fsStyle & BTNS_SEP))
+            continue;
+
+        if (!GetItemRect(i, &rc))
+            continue;
+
+        pt.x = 0;
+        pt.y = (rc.top + rc.bottom) / 2;
+        ClientToScreen(&pt);
+
+        dist = pt.y > y ? pt.y - y : y - pt.y;
+        if (dist < bestDist)
+        {
+            bestDist = dist;
+            bestItem = btn.idCommand;
+        }
+    }
+
+    if (bestItem < 0)
+        return S_FALSE;
+
+    m_menuBand->_ChangeHotItem(this, bestItem, 0);
+    return S_OK;
+}
+
 HRESULT CMenuToolbarBase::AddButton(DWORD commandId, LPCWSTR caption, BOOL hasSubMenu, INT iconId, DWORD_PTR buttonData, BOOL last)
 {
     TBBUTTON tbb = { 0 };
@@ -2521,20 +2588,35 @@ HRESULT CMenuSFToolbar::InternalContextMenu(INT iItem, INT index, DWORD_PTR dwDa
 
     if (bCanPin || bCanRemoveRecent)
     {
+        WCHAR szMenuText[128];
+
         if (GetMenuItemCount(popup) > 0)
             InsertMenuW(popup, GetMenuItemCount(popup), MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
         if (bCanPin)
         {
+            if (!LoadStringW(GetModuleHandleW(L"shell32.dll"),
+                             bPinned ? IDS_STARTPANEL_UNPIN : IDS_STARTPANEL_PIN,
+                             szMenuText, _countof(szMenuText)))
+            {
+                StringCchCopyW(szMenuText, _countof(szMenuText),
+                               bPinned ? L"Unpin from Start menu" : L"Pin to Start menu");
+            }
+
             InsertMenuW(popup, GetMenuItemCount(popup), MF_BYPOSITION | MF_STRING,
-                        bPinned ? IDM_STARTPANEL_UNPIN : IDM_STARTPANEL_PIN,
-                        bPinned ? L"Unpin from Start Menu" : L"Pin to Start Menu");
+                        bPinned ? IDM_STARTPANEL_UNPIN : IDM_STARTPANEL_PIN, szMenuText);
         }
 
         if (bCanRemoveRecent)
         {
+            if (!LoadStringW(GetModuleHandleW(L"shell32.dll"), IDS_STARTPANEL_REMOVEITEM,
+                             szMenuText, _countof(szMenuText)))
+            {
+                StringCchCopyW(szMenuText, _countof(szMenuText), L"Remove from this list");
+            }
+
             InsertMenuW(popup, GetMenuItemCount(popup), MF_BYPOSITION | MF_STRING,
-                        IDM_STARTPANEL_REMOVE, L"Remove from this list");
+                        IDM_STARTPANEL_REMOVE, szMenuText);
         }
     }
 
