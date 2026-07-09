@@ -82,6 +82,44 @@ ULONG PspJobInfoAlign[] =
 
 /* FUNCTIONS *****************************************************************/
 
+static
+VOID
+NTAPI
+PspApplyJobLimits(IN PEJOB Job,
+                  IN PJOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimit,
+                  IN PJOBOBJECT_EXTENDED_LIMIT_INFORMATION ExtendedLimit)
+{
+    ASSERT(Job);
+    ASSERT(BasicLimit);
+
+    Job->LimitFlags = BasicLimit->LimitFlags;
+    Job->MinimumWorkingSetSize = (ULONG)BasicLimit->MinimumWorkingSetSize;
+    Job->MaximumWorkingSetSize = (ULONG)BasicLimit->MaximumWorkingSetSize;
+    Job->ActiveProcessLimit = BasicLimit->ActiveProcessLimit;
+    Job->Affinity = (ULONG)BasicLimit->Affinity;
+    Job->PriorityClass = (UCHAR)BasicLimit->PriorityClass;
+    Job->SchedulingClass = BasicLimit->SchedulingClass;
+    Job->PerProcessUserTimeLimit = BasicLimit->PerProcessUserTimeLimit;
+    Job->PerJobUserTimeLimit = BasicLimit->PerJobUserTimeLimit;
+
+    if (ExtendedLimit != NULL)
+    {
+        KeAcquireGuardedMutexUnsafe(&Job->MemoryLimitsLock);
+        Job->ProcessMemoryLimit = (ULONG)(ExtendedLimit->ProcessMemoryLimit >> PAGE_SHIFT);
+        Job->JobMemoryLimit = (ULONG)(ExtendedLimit->JobMemoryLimit >> PAGE_SHIFT);
+        KeReleaseGuardedMutexUnsafe(&Job->MemoryLimitsLock);
+    }
+}
+
+ULONG
+NTAPI
+PsGetJobUIRestrictionsClass(IN PEJOB Job);
+
+VOID
+NTAPI
+PsSetJobUIRestrictionsClass(IN PEJOB Job,
+                            IN ULONG UIRestrictionsClass);
+
 VOID
 NTAPI
 PspDeleteJob ( PVOID ObjectBody )
@@ -119,8 +157,47 @@ NTAPI
 PspAssignProcessToJob(PEPROCESS Process,
     PEJOB Job)
 {
-    DPRINT("PspAssignProcessToJob() is unimplemented!\n");
-    return STATUS_NOT_IMPLEMENTED;
+    NTSTATUS Status = STATUS_SUCCESS;
+    PKTHREAD CurrentThread;
+
+    ASSERT(Process);
+    ASSERT(Job);
+
+    CurrentThread = KeGetCurrentThread();
+
+    KeEnterGuardedRegionThread(CurrentThread);
+    ExAcquireResourceExclusiveLite(&Job->JobLock, TRUE);
+
+    if (Process->Job != NULL && Process->Job != Job)
+    {
+        Status = STATUS_ACCESS_DENIED;
+        goto Cleanup;
+    }
+
+    if (Process->JobLinks.Flink != NULL || Process->JobLinks.Blink != NULL)
+    {
+        Status = STATUS_ACCESS_DENIED;
+        goto Cleanup;
+    }
+
+    if ((Job->LimitFlags & JOB_OBJECT_LIMIT_ACTIVE_PROCESS) &&
+        (Job->ActiveProcesses >= Job->ActiveProcessLimit))
+    {
+        Status = STATUS_QUOTA_EXCEEDED;
+        goto Cleanup;
+    }
+
+    InsertTailList(&Job->ProcessListHead, &Process->JobLinks);
+    Process->JobStatus &= ~2;
+    Process->Job = Job;
+    ObReferenceObject(Job);
+    Job->TotalProcesses++;
+    Job->ActiveProcesses++;
+
+Cleanup:
+    ExReleaseResourceLite(&Job->JobLock);
+    KeLeaveGuardedRegionThread(CurrentThread);
+    return Status;
 }
 
 NTSTATUS
@@ -138,7 +215,30 @@ NTAPI
 PspRemoveProcessFromJob(IN PEPROCESS Process,
                         IN PEJOB Job)
 {
-    /* FIXME */
+    PKTHREAD CurrentThread;
+
+    ASSERT(Process);
+    ASSERT(Job);
+
+    CurrentThread = KeGetCurrentThread();
+
+    KeEnterGuardedRegionThread(CurrentThread);
+    ExAcquireResourceExclusiveLite(&Job->JobLock, TRUE);
+
+    if (Process->JobLinks.Flink != NULL && Process->JobLinks.Blink != NULL)
+    {
+        RemoveEntryList(&Process->JobLinks);
+        Process->JobLinks.Flink = NULL;
+        Process->JobLinks.Blink = NULL;
+
+        if (!BooleanFlagOn(Process->JobStatus, 2) && Job->ActiveProcesses != 0)
+        {
+            Job->ActiveProcesses--;
+        }
+    }
+
+    ExReleaseResourceLite(&Job->JobLock);
+    KeLeaveGuardedRegionThread(CurrentThread);
 }
 
 VOID
@@ -146,7 +246,28 @@ NTAPI
 PspExitProcessFromJob(IN PEJOB Job,
                       IN PEPROCESS Process)
 {
-    /* FIXME */
+    PKTHREAD CurrentThread;
+
+    ASSERT(Process);
+    ASSERT(Job);
+
+    CurrentThread = KeGetCurrentThread();
+
+    KeEnterGuardedRegionThread(CurrentThread);
+    ExAcquireResourceExclusiveLite(&Job->JobLock, TRUE);
+
+    if (!BooleanFlagOn(Process->JobStatus, 2))
+    {
+        Process->JobStatus |= 2;
+        if (Job->ActiveProcesses != 0)
+        {
+            Job->ActiveProcesses--;
+        }
+        Job->TotalTerminatedProcesses++;
+    }
+
+    ExReleaseResourceLite(&Job->JobLock);
+    KeLeaveGuardedRegionThread(CurrentThread);
 }
 
 /*
@@ -201,12 +322,7 @@ NtAssignProcessToJobObject (
                 {
                     if(Process->Job == NULL && PsGetProcessSessionId(Process) == Job->SessionId)
                     {
-                        /* Just store the pointer to the job object in the process, we'll
-                        assign it later. The reason we can't do this here is that locking
-                        the job object might require it to wait, which is a bad thing
-                        while holding the process lock! */
-                        Process->Job = Job;
-                        ObReferenceObject(Job);
+                        Status = STATUS_SUCCESS;
                     }
                     else
                     {
@@ -221,6 +337,10 @@ NtAssignProcessToJobObject (
                         the process lock anymore! */
                         Status = PspAssignProcessToJob(Process, Job);
                     }
+                }
+                else
+                {
+                    Status = STATUS_PROCESS_IS_TERMINATING;
                 }
 
                 ObDereferenceObject(Job);
@@ -497,6 +617,7 @@ NtQueryInformationJobObject (
     PKTHREAD CurrentThread;
     KPROCESSOR_MODE PreviousMode;
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION ExtendedLimit;
+    JOBOBJECT_BASIC_UI_RESTRICTIONS BasicUiRestrictions;
     JOBOBJECT_BASIC_AND_IO_ACCOUNTING_INFORMATION BasicAndIo;
     ULONG RequiredLength, RequiredAlign, SizeToCopy, NeededSize;
 
@@ -707,6 +828,12 @@ NtQueryInformationJobObject (
 
             break;
 
+        case JobObjectBasicUIRestrictions:
+            BasicUiRestrictions.UIRestrictionsClass = PsGetJobUIRestrictionsClass(Job);
+            GenericCopy = &BasicUiRestrictions;
+            Status = STATUS_SUCCESS;
+            break;
+
         default:
             DPRINT1("Class %d not implemented\n", JobInformationClass);
             Status = STATUS_NOT_IMPLEMENTED;
@@ -824,8 +951,27 @@ NtSetInformationJobObject (
     KeEnterGuardedRegionThread(CurrentThread);
     switch (JobInformationClass)
     {
+        case JobObjectBasicLimitInformation:
+            ExAcquireResourceExclusiveLite(&Job->JobLock, TRUE);
+            PspApplyJobLimits(Job,
+                              (PJOBOBJECT_BASIC_LIMIT_INFORMATION)JobInformation,
+                              NULL);
+            ExReleaseResourceLite(&Job->JobLock);
+            Status = STATUS_SUCCESS;
+            break;
+
         case JobObjectExtendedLimitInformation:
-            DPRINT1("Class JobObjectExtendedLimitInformation not implemented\n");
+            ExAcquireResourceExclusiveLite(&Job->JobLock, TRUE);
+            PspApplyJobLimits(Job,
+                              &((PJOBOBJECT_EXTENDED_LIMIT_INFORMATION)JobInformation)->BasicLimitInformation,
+                              (PJOBOBJECT_EXTENDED_LIMIT_INFORMATION)JobInformation);
+            ExReleaseResourceLite(&Job->JobLock);
+            Status = STATUS_SUCCESS;
+            break;
+
+        case JobObjectBasicUIRestrictions:
+            PsSetJobUIRestrictionsClass(Job,
+                ((PJOBOBJECT_BASIC_UI_RESTRICTIONS)JobInformation)->UIRestrictionsClass);
             Status = STATUS_SUCCESS;
             break;
 
