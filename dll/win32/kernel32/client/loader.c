@@ -13,6 +13,104 @@
 
 /* FUNCTIONS ****************************************************************/
 
+static
+BOOLEAN
+BasepIsPathlessDllName(_In_ PCUNICODE_STRING DllName)
+{
+    USHORT Index;
+
+    for (Index = 0; Index < DllName->Length / sizeof(WCHAR); ++Index)
+    {
+        WCHAR Char = DllName->Buffer[Index];
+        if ((Char == L'\\') || (Char == L'/') || (Char == L':'))
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+static
+BOOLEAN
+BasepDllNameEquals(_In_ PCUNICODE_STRING DllName,
+                   _In_z_ PCWSTR Name)
+{
+    UNICODE_STRING CompareName;
+
+    RtlInitUnicodeString(&CompareName, Name);
+    return RtlEqualUnicodeString(DllName, &CompareName, TRUE);
+}
+
+static
+BOOLEAN
+BasepDllNameStartsWith(_In_ PCUNICODE_STRING DllName,
+                       _In_z_ PCWSTR Prefix)
+{
+    SIZE_T PrefixLength;
+
+    PrefixLength = strlenW(Prefix);
+    if (DllName->Length < PrefixLength * sizeof(WCHAR))
+        return FALSE;
+
+    return !_wcsnicmp(DllName->Buffer, Prefix, PrefixLength);
+}
+
+static
+NTSTATUS
+BasepRedirectModernDllName(_In_ PCUNICODE_STRING DllName,
+                           _Out_ PUNICODE_STRING RedirectedName,
+                           _Out_ PBOOLEAN Redirected)
+{
+    static const WCHAR Kernel32Dll[] = L"kernel32.dll";
+    static const WCHAR BcryptDll[] = L"bcrypt.dll";
+    static const WCHAR Shell32Dll[] = L"shell32.dll";
+    PCWSTR Replacement = NULL;
+
+    *Redirected = FALSE;
+    RedirectedName->Buffer = NULL;
+    RedirectedName->Length = 0;
+    RedirectedName->MaximumLength = 0;
+
+    if (!BasepIsPathlessDllName(DllName))
+        return STATUS_SUCCESS;
+
+    if (BasepDllNameEquals(DllName, L"kernelbase") ||
+        BasepDllNameEquals(DllName, L"kernelbase.dll"))
+    {
+        Replacement = Kernel32Dll;
+    }
+    else if (BasepDllNameEquals(DllName, L"bcryptprimitives") ||
+             BasepDllNameEquals(DllName, L"bcryptprimitives.dll"))
+    {
+        Replacement = BcryptDll;
+    }
+    else if (BasepDllNameStartsWith(DllName, L"api-ms-win-core-") ||
+             BasepDllNameStartsWith(DllName, L"ext-ms-win-"))
+    {
+        Replacement = Kernel32Dll;
+    }
+    else if (BasepDllNameStartsWith(DllName, L"api-ms-win-appmodel-runtime-"))
+    {
+        Replacement = Kernel32Dll;
+    }
+    else if (BasepDllNameStartsWith(DllName, L"api-ms-win-cng-rng-"))
+    {
+        Replacement = BcryptDll;
+    }
+    else if (BasepDllNameStartsWith(DllName, L"api-ms-win-downlevel-shell32-"))
+    {
+        Replacement = Shell32Dll;
+    }
+
+    if (!Replacement)
+        return STATUS_SUCCESS;
+
+    if (!RtlCreateUnicodeString(RedirectedName, Replacement))
+        return STATUS_NO_MEMORY;
+
+    *Redirected = TRUE;
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS
 WINAPI
 BasepInitializeTermsrvFpns(VOID)
@@ -294,7 +392,9 @@ LoadLibraryExW(LPCWSTR lpLibFileName,
     NTSTATUS Status;
     PWSTR SearchPath;
     ULONG DllCharacteristics = 0;
+    BOOLEAN RedirectedString = FALSE;
     BOOL FreeString = FALSE;
+    UNICODE_STRING RedirectedDllName;
 
     /* Check for any flags LdrLoadDll might be interested in */
     if (dwFlags & DONT_RESOLVE_DLL_REFERENCES)
@@ -305,6 +405,7 @@ LoadLibraryExW(LPCWSTR lpLibFileName,
 
     /* Build up a unicode dll name from null-terminated string */
     RtlInitUnicodeString(&DllName, (LPWSTR)lpLibFileName);
+    RtlInitEmptyUnicodeString(&RedirectedDllName, NULL, 0);
 
     /* Lazy-initialize BasepExeLdrEntry */
     if (!BasepExeLdrEntry)
@@ -332,6 +433,21 @@ LoadLibraryExW(LPCWSTR lpLibFileName,
             DllName.Length -= sizeof(WCHAR);
         }
         DllName.Buffer[DllName.Length/sizeof(WCHAR)] = UNICODE_NULL;
+        FreeString = TRUE;
+    }
+
+    Status = BasepRedirectModernDllName(&DllName, &RedirectedDllName, &RedirectedString);
+    if (!NT_SUCCESS(Status))
+    {
+        if (FreeString) RtlFreeUnicodeString(&DllName);
+        BaseSetLastNTError(Status);
+        return NULL;
+    }
+
+    if (RedirectedString)
+    {
+        if (FreeString) RtlFreeUnicodeString(&DllName);
+        DllName = RedirectedDllName;
         FreeString = TRUE;
     }
 
