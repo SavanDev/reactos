@@ -40,6 +40,7 @@
 @ stdcall GetFinalPathNameByHandleA(ptr str long long)
 @ stdcall GetFinalPathNameByHandleW(ptr wstr long long)
 @ stdcall GetLocaleInfoEx(wstr long ptr long)
+@ stdcall GetSystemDefaultLocaleName(wstr long)
 @ stdcall GetSystemPreferredUILanguages(long ptr wstr ptr)
 @ stdcall GetThreadPreferredUILanguages(long ptr wstr ptr)
 @ stdcall GetThreadUILanguage()
