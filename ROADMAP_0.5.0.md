@@ -2,9 +2,9 @@
 
 ## Objective
 
-The `0.5.x` line in this fork is a personal stabilization track, not a public promise of upstream release management.
+See [About This Fork](README.md#about-this-fork) for what "personal" means here; this is not a public promise of upstream release management.
 
-It is the current baseline used to shape the system toward the maintainer's preferred behavior while studying and retouching ReactOS.
+The `0.5.x` line is the current baseline used to shape the system toward the maintainer's preferred behavior while studying and retouching ReactOS.
 
 The target user experience is:
 
@@ -34,12 +34,7 @@ Changes are out of scope when they:
 
 ## Priority order
 
-1. Shell and interactive session
-2. Boot, setup, logon and shutdown
-3. Storage and networking reliability
-4. Services and recovery paths
-5. Kernel simplifications that reduce deadlocks, races or corruption
-6. New features
+See [Technical Direction](TECHNICAL_DIRECTION.md#engineering-priorities) for the canonical subsystem priority order. The backlog below applies that order to concrete work items for this line.
 
 ## First stabilization backlog
 
