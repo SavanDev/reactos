@@ -1,9 +1,6 @@
 # Contributing To This Fork
 
-This fork is not organized as an always-open collective project.
-It is primarily a personal workspace for experimenting, studying ReactOS, and shaping the `0.5.x` line to the fork owner's preferences.
-
-That means:
+See [About This Fork](README.md#about-this-fork) for why this repository is not organized as an always-open collective project. In practice, that means:
 
 - there is no promise of active PR triage, review cadence or merge timing
 - broad feature proposals are usually less useful than small, concrete fixes

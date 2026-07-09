@@ -95,7 +95,7 @@ __NOTE:__ The upstream bug tracker is _not_ for discussions. Use the upstream [o
 
 ## Contributing
 
-This fork is not run like an open team project. The default assumption is that it is maintained for personal experimentation and day-to-day work, not for an ongoing public contribution process.
+See [About This Fork](#about-this-fork) — the default assumption is personal experimentation and day-to-day work, not an ongoing public contribution process.
 
 If you want to understand the direction of this fork or prepare a patch anyway, read [CONTRIBUTING.md](CONTRIBUTING.md) first. Small, focused changes that improve NT 5.x-visible behavior, stability and diagnosability fit this fork better than broad rewrites or architecture work done for its own sake.
 
