@@ -48,6 +48,37 @@ RegisterWaitForInputIdle(WaitForInputIdleType lpfnRegisterWaitForInputIdle);
 
 #define CMD_STRING L"cmd /c "
 
+#ifndef EXTENDED_STARTUPINFO_PRESENT
+#define EXTENDED_STARTUPINFO_PRESENT 0x00080000
+#endif
+
+#ifndef PROC_THREAD_ATTRIBUTE_HANDLE_LIST
+#define PROC_THREAD_ATTRIBUTE_HANDLE_LIST 0x00020002
+#endif
+
+struct proc_thread_attr
+{
+    DWORD_PTR attr;
+    SIZE_T size;
+    void *value;
+};
+
+struct _PROC_THREAD_ATTRIBUTE_LIST
+{
+    DWORD mask;
+    DWORD size;
+    DWORD count;
+    DWORD pad;
+    DWORD_PTR unk;
+    struct proc_thread_attr attrs[1];
+};
+
+typedef struct _HANDLE_INHERIT_STATE
+{
+    HANDLE Handle;
+    DWORD Flags;
+} HANDLE_INHERIT_STATE, *PHANDLE_INHERIT_STATE;
+
 /* FUNCTIONS ****************************************************************/
 
 VOID
@@ -2126,6 +2157,7 @@ CreateProcessInternalW(IN HANDLE hUserToken,
     PVOID TibValue;
     PIMAGE_NT_HEADERS NtHeaders;
     STARTUPINFOW StartupInfo;
+    LPSTARTUPINFOEXW StartupInfoEx;
     PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
     UNICODE_STRING DebuggerString;
     BOOL Result;
@@ -2164,6 +2196,9 @@ CreateProcessInternalW(IN HANDLE hUserToken,
     ULONG ConglomeratedBufferSizeBytes, StaticBufferSize, i;
 #endif
     ULONG FusionFlags;
+    const struct proc_thread_attr *HandleList;
+    PHANDLE_INHERIT_STATE HandleInheritState;
+    ULONG HandleInheritCount, HandleIndex;
 
     //
     // Variables used for path conversion (and partially Fusion/SxS)
@@ -2212,10 +2247,14 @@ CreateProcessInternalW(IN HANDLE hUserToken,
     AppCompatSxsData = NULL;
     AppCompatSxsDataSize = 0;
     CaptureBuffer = NULL;
+    StartupInfoEx = NULL;
 #if _SXS_SUPPORT_ENABLED_
     SxsConglomeratedBuffer = NULL;
 #endif
     FusionFlags = 0;
+    HandleList = NULL;
+    HandleInheritState = NULL;
+    HandleInheritCount = 0;
 
     /* Zero out initial parsing variables -- others are initialized later */
     DebuggerCmdLine = NULL;
@@ -2416,6 +2455,73 @@ CreateProcessInternalW(IN HANDLE hUserToken,
 
     /* Make a copy of the caller's startup info since we'll modify it */
     StartupInfo = *lpStartupInfo;
+
+    /*
+     * ReactOS still follows the classic process-creation path here.
+     * If a caller passes a Vista+ handle list, approximate it by
+     * temporarily marking those handles inheritable for this create.
+     */
+    if (dwCreationFlags & EXTENDED_STARTUPINFO_PRESENT)
+    {
+        StartupInfoEx = (LPSTARTUPINFOEXW)lpStartupInfo;
+        if (StartupInfoEx->lpAttributeList)
+        {
+            struct _PROC_THREAD_ATTRIBUTE_LIST *AttributeList;
+
+            AttributeList = (struct _PROC_THREAD_ATTRIBUTE_LIST *)StartupInfoEx->lpAttributeList;
+            for (HandleIndex = 0; HandleIndex < AttributeList->count; ++HandleIndex)
+            {
+                if (AttributeList->attrs[HandleIndex].attr == PROC_THREAD_ATTRIBUTE_HANDLE_LIST)
+                {
+                    HandleList = &AttributeList->attrs[HandleIndex];
+                    break;
+                }
+            }
+        }
+
+        if (HandleList && HandleList->value && HandleList->size)
+        {
+            PHANDLE Handles;
+
+            HandleInheritCount = (ULONG)(HandleList->size / sizeof(HANDLE));
+            HandleInheritState = RtlAllocateHeap(RtlGetProcessHeap(),
+                                                 HEAP_ZERO_MEMORY,
+                                                 HandleInheritCount * sizeof(*HandleInheritState));
+            if (!HandleInheritState)
+            {
+                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+                Result = FALSE;
+                goto Quickie;
+            }
+
+            Handles = (PHANDLE)HandleList->value;
+            for (HandleIndex = 0; HandleIndex < HandleInheritCount; ++HandleIndex)
+            {
+                HandleInheritState[HandleIndex].Handle = Handles[HandleIndex];
+                if (!GetHandleInformation(Handles[HandleIndex],
+                                          &HandleInheritState[HandleIndex].Flags))
+                {
+                    Result = FALSE;
+                    goto Quickie;
+                }
+
+                if (!(HandleInheritState[HandleIndex].Flags & HANDLE_FLAG_INHERIT))
+                {
+                    if (!SetHandleInformation(Handles[HandleIndex],
+                                              HANDLE_FLAG_INHERIT,
+                                              HANDLE_FLAG_INHERIT))
+                    {
+                        Result = FALSE;
+                        goto Quickie;
+                    }
+                }
+            }
+
+            bInheritHandles = TRUE;
+        }
+
+        dwCreationFlags &= ~EXTENDED_STARTUPINFO_PRESENT;
+    }
 
     /* Check if private data is being sent on the same channel as std handles */
     if ((StartupInfo.dwFlags & STARTF_USESTDHANDLES) &&
@@ -4364,6 +4470,21 @@ Quickie:
     RtlFreeHeap(RtlGetProcessHeap(), 0, NameBuffer);
     RtlFreeHeap(RtlGetProcessHeap(), 0, CurrentDirectory);
     RtlFreeHeap(RtlGetProcessHeap(), 0, FreeBuffer);
+
+    if (HandleInheritState)
+    {
+        for (HandleIndex = 0; HandleIndex < HandleInheritCount; ++HandleIndex)
+        {
+            if (!(HandleInheritState[HandleIndex].Flags & HANDLE_FLAG_INHERIT))
+            {
+                SetHandleInformation(HandleInheritState[HandleIndex].Handle,
+                                     HANDLE_FLAG_INHERIT,
+                                     0);
+            }
+        }
+
+        RtlFreeHeap(RtlGetProcessHeap(), 0, HandleInheritState);
+    }
 
     /* Close open file/section handles */
     if (FileHandle) NtClose(FileHandle);
