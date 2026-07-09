@@ -43,6 +43,24 @@ typedef struct _SERVICE_GROUP
 } SERVICE_GROUP, *PSERVICE_GROUP;
 
 
+typedef enum _SERVICE_RUNTIME_STATE
+{
+    ServiceRuntimeStopped = 0,
+    ServiceRuntimePipeReady,
+    ServiceRuntimeSpawning,
+    ServiceRuntimeConnecting,
+    ServiceRuntimeDispatching,
+    ServiceRuntimeTeardown
+} SERVICE_RUNTIME_STATE, *PSERVICE_RUNTIME_STATE;
+
+typedef struct _SERVICE_RUNTIME
+{
+    HANDLE hControlPipe;
+    HANDLE hProcess;
+    DWORD dwProcessId;
+    SERVICE_RUNTIME_STATE State;
+} SERVICE_RUNTIME, *PSERVICE_RUNTIME;
+
 typedef struct _SERVICE_IMAGE
 {
     LIST_ENTRY ImageListEntry;
@@ -50,13 +68,13 @@ typedef struct _SERVICE_IMAGE
     LPWSTR pszAccountName;
     DWORD dwImageRunCount;
 
-    HANDLE hControlPipe;
-    HANDLE hProcess;
-    DWORD dwProcessId;
+    PSERVICE_RUNTIME Runtime; /* Source of truth for live process and pipe state */
+    HANDLE hControlPipe;      /* Compatibility shim mirrored from Runtime */
+    HANDLE hProcess;          /* Compatibility shim mirrored from Runtime */
+    DWORD dwProcessId;        /* Compatibility shim mirrored from Runtime */
     HANDLE hToken;
     HANDLE hProfile;
 } SERVICE_IMAGE, *PSERVICE_IMAGE;
-
 
 typedef struct _SERVICE
 {
@@ -86,6 +104,8 @@ typedef struct _SERVICE
     WCHAR szServiceName[1];
 } SERVICE, *PSERVICE;
 
+
+#define SERVICE_INTERNAL_FLAG_START_VISITING 0x00000001
 
 #define LOCK_TAG 0x4C697041 /* 'ApiL' */
 
