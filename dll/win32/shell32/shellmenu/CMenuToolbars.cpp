@@ -536,19 +536,21 @@ static BOOL MigratePinnedProgramsFromRegistry()
     return Migrated > 0;
 }
 
-static UINT LoadBuiltInPinnedPrograms(WCHAR LinkEntries[][MAX_PATH], WCHAR RecentEntries[][MAX_PATH], UINT cEntries)
+static UINT LoadBuiltInPinnedPrograms(WCHAR LinkEntries[][MAX_PATH], WCHAR RecentEntries[][MAX_PATH],
+                                      WCHAR NameEntries[][MAX_PATH], UINT cEntries)
 {
     static const struct
     {
         LPCWSTR pszShortcutSubPath;
         LPCWSTR pszTargetFileName;
+        LPCWSTR pszDisplayName;
     } s_DefaultItems[] =
     {
-        { NULL, L"iexplore.exe" },
-        { L"Accessories\\Notepad.lnk", L"notepad.exe" },
-        { L"Accessories\\Paint.lnk", L"mspaint.exe" },
-        { L"Accessories\\Calculator.lnk", L"calc.exe" },
-        { L"Accessories\\WordPad.lnk", L"wordpad.exe" },
+        { NULL, L"iexplore.exe", L"Internet Browser" },
+        { L"Accessories\\Notepad.lnk", L"notepad.exe", L"Notepad" },
+        { L"Accessories\\Paint.lnk", L"mspaint.exe", L"Paint" },
+        { L"Accessories\\Calculator.lnk", L"calc.exe", L"Calculator" },
+        { L"Accessories\\WordPad.lnk", L"wordpad.exe", L"WordPad" },
     };
 
     WCHAR szPath[MAX_PATH];
@@ -558,9 +560,13 @@ static UINT LoadBuiltInPinnedPrograms(WCHAR LinkEntries[][MAX_PATH], WCHAR Recen
     for (i = 0; i < _countof(s_DefaultItems) && Count < cEntries; ++i)
     {
         BOOL bResolved = FALSE;
+        BOOL bFromShortcut = FALSE;
 
         if (s_DefaultItems[i].pszShortcutSubPath)
+        {
             bResolved = ResolveStartPanelProgramsShortcut(s_DefaultItems[i].pszShortcutSubPath, szPath, _countof(szPath));
+            bFromShortcut = bResolved;
+        }
 
         if (!bResolved && s_DefaultItems[i].pszTargetFileName)
             bResolved = ResolveStartPanelDefaultTarget(s_DefaultItems[i].pszTargetFileName, szPath, _countof(szPath));
@@ -570,6 +576,11 @@ static UINT LoadBuiltInPinnedPrograms(WCHAR LinkEntries[][MAX_PATH], WCHAR Recen
 
         StringCchCopyW(LinkEntries[Count], MAX_PATH, szPath);
         NormalizeStartPanelRecentPath(szPath, RecentEntries[Count], MAX_PATH);
+
+        /* Shortcuts already carry a presentable name; bare executables do not. */
+        if (NameEntries && !bFromShortcut)
+            StringCchCopyW(NameEntries[Count], MAX_PATH, s_DefaultItems[i].pszDisplayName);
+
         ++Count;
     }
 
@@ -708,13 +719,18 @@ static void GetPathDisplayName(LPCWSTR pszPath, LPWSTR pszText, UINT cchText)
     SHFILEINFOW sfi = { 0 };
 
     if (SHGetFileInfoW(pszPath, 0, &sfi, sizeof(sfi), SHGFI_DISPLAYNAME) && sfi.szDisplayName[0])
-    {
         StringCchCopyW(pszText, cchText, sfi.szDisplayName);
-        return;
-    }
+    else
+        StringCchCopyW(pszText, cchText, PathFindFileNameW(pszPath));
 
-    StringCchCopyW(pszText, cchText, PathFindFileNameW(pszPath));
-    PathRemoveExtensionW(pszText);
+    /* The panel lists programs, so drop the extension when the display name
+     * is still a bare file name (happens when extensions are not hidden). */
+    if (PathMatchSpecW(pszText, L"*.exe") || PathMatchSpecW(pszText, L"*.com") ||
+        PathMatchSpecW(pszText, L"*.bat") || PathMatchSpecW(pszText, L"*.cmd") ||
+        PathMatchSpecW(pszText, L"*.lnk"))
+    {
+        PathRemoveExtensionW(pszText);
+    }
 }
 
 // FIXME: Enable if/when wine comctl supports this flag properly
@@ -2217,12 +2233,12 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
     {
         WCHAR PinnedPrograms[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
         WCHAR PinnedRecentPrograms[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
+        WCHAR PinnedNames[STARTPANEL_PINNED_LIMIT][MAX_PATH] = { { 0 } };
         WCHAR RecentPrograms[STARTPANEL_RECENT_LIMIT][MAX_PATH] = { { 0 } };
         UINT PinnedCount;
         UINT RecentCount;
         UINT RecentVisibleCount = 0;
         UINT AddedCount = 0;
-        LPITEMIDLIST pidlPrograms = NULL;
 
         PinnedCount = LoadPinnedProgramsFromFolder(PinnedPrograms, PinnedRecentPrograms,
                                                    _countof(PinnedPrograms));
@@ -2240,7 +2256,7 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
         if (PinnedCount == 0)
         {
             PinnedCount = LoadBuiltInPinnedPrograms(PinnedPrograms, PinnedRecentPrograms,
-                                                    _countof(PinnedPrograms));
+                                                    PinnedNames, _countof(PinnedPrograms));
         }
 
         RecentCount = LoadStartPanelProgramList(s_szRecentPrograms, RecentPrograms, _countof(RecentPrograms));
@@ -2270,7 +2286,11 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
             if (!pData)
                 continue;
 
-            GetPathDisplayName(PinnedPrograms[i], szText, _countof(szText));
+            if (PinnedNames[i][0])
+                StringCchCopyW(szText, _countof(szText), PinnedNames[i]);
+            else
+                GetPathDisplayName(PinnedPrograms[i], szText, _countof(szText));
+
             hr = AddButton(CommandId++, szText, FALSE, GetPathIconIndex(PinnedPrograms[i]),
                            reinterpret_cast<DWORD_PTR>(pData), FALSE);
             if (FAILED(hr))
@@ -2311,87 +2331,19 @@ HRESULT CMenuSFToolbar::FillToolbar(BOOL clearFirst)
             ++AddedCount;
         }
 
-        for (INT i = 0; i < DPA_GetPtrCount(dpaSort); ++i)
-        {
-            item = static_cast<LPITEMIDLIST>(DPA_GetPtr(dpaSort, i));
-            if (item && IsPidlPrograms(item))
-            {
-                pidlPrograms = item;
-                DPA_DeletePtr(dpaSort, i);
-                break;
-            }
-        }
-
-        if (AddedCount > 0 && pidlPrograms != NULL)
+        if (AddedCount > 0 && DPA_GetPtrCount(dpaSort) > 0)
             AddSeparator(FALSE);
 
-        if (pidlPrograms)
+        if (AddedCount == 0 && DPA_GetPtrCount(dpaSort) == 0)
         {
-            STRRET sr = { STRRET_CSTR };
-            PWSTR MenuString = NULL;
-            INT indexOpen = 0;
-            INT index;
-            LPCITEMIDLIST itemc = pidlPrograms;
-            SFGAOF attrs = SFGAO_FOLDER;
-            STARTPANEL_ITEMDATA *pData;
-
-            hr = m_shellFolder->GetDisplayNameOf(pidlPrograms, SIGDN_NORMALDISPLAY, &sr);
-            if (FAILED_UNEXPECTEDLY(hr))
-            {
-                DPA_Destroy(dpaSort);
-                ILFree(pidlPrograms);
-                return hr;
-            }
-
-            hr = StrRetToStr(&sr, NULL, &MenuString);
-            if (FAILED_UNEXPECTEDLY(hr))
-            {
-                DPA_Destroy(dpaSort);
-                ILFree(pidlPrograms);
-                return hr;
-            }
-
-            index = SHMapPIDLToSystemImageListIndex(m_shellFolder, pidlPrograms, &indexOpen);
-            hr = m_shellFolder->GetAttributesOf(1, &itemc, &attrs);
-            if (FAILED_UNEXPECTEDLY(hr))
-            {
-                CoTaskMemFree(MenuString);
-                DPA_Destroy(dpaSort);
-                ILFree(pidlPrograms);
-                return hr;
-            }
-
-            pData = CreatePidlItemData(pidlPrograms);
-            if (!pData)
-            {
-                CoTaskMemFree(MenuString);
-                DPA_Destroy(dpaSort);
-                ILFree(pidlPrograms);
-                return E_OUTOFMEMORY;
-            }
-
-            hr = AddButton(CommandId++, MenuString, attrs & SFGAO_FOLDER, index,
-                           reinterpret_cast<DWORD_PTR>(pData), TRUE);
-            CoTaskMemFree(MenuString);
-            if (FAILED(hr))
-            {
-                DestroyItemData(pData);
-                DPA_Destroy(dpaSort);
-                return hr;
-            }
-
-            ++AddedCount;
+            DPA_Destroy(dpaSort);
+            return AddPlaceholder();
         }
 
-        for (INT i = 0; i < DPA_GetPtrCount(dpaSort); ++i)
-            ILFree(static_cast<LPITEMIDLIST>(DPA_GetPtr(dpaSort, i)));
-
-        DPA_Destroy(dpaSort);
-
-        if (AddedCount == 0)
-            return AddPlaceholder();
-
-        return S_OK;
+        /* The shell folder items left in the DPA (All Programs, plus anything
+         * else placed in the Start Menu root) are appended by the loop below.
+         * They cannot be matched by path here because the enumerated pidls are
+         * relative to the merged folder. */
     }
 
     for (INT i = 0; i < DPA_GetPtrCount(dpaSort);)

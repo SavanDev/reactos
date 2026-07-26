@@ -70,6 +70,9 @@ CMenuBand::~CMenuBand()
 
 BOOL CMenuBand::IsStartPanelLayout() const
 {
+    /* Must not depend on the toolbars existing: the shell folder toolbar is
+     * filled from SetSite, before SMC_INITMENU creates the static one, and it
+     * needs this to already report the panel layout to pick its contents. */
     return (m_dwFlags & (SMINIT_TOPLEVEL | SMINIT_VERTICAL)) == (SMINIT_TOPLEVEL | SMINIT_VERTICAL) &&
            SHELL_GetSetting(SSF_STARTPANELON, fStartPanelOn);
 }
@@ -452,7 +455,15 @@ HRESULT STDMETHODCALLTYPE  CMenuBand::ShowDW(BOOL fShow)
             return hr;
     }
 
-    if (!fShow && m_parentBand)
+    if (fShow)
+    {
+        /* Builds the static half of the menu (the tray's HMENU template).
+         * Without this the static toolbar is never created. */
+        hr = _CallCB(SMC_INITMENU, 0, 0);
+        if (FAILED_UNEXPECTEDLY(hr))
+            return hr;
+    }
+    else if (m_parentBand)
     {
         m_parentBand->SetClient(NULL);
     }
